@@ -1,4 +1,4 @@
-
+`include "/Users/zbl/Desktop/RISCV-CPU/riscv/src/constant.v"
 module fetcher(
     input       clk_in,
     input       rst_in,
