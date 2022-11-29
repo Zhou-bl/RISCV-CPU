@@ -6,7 +6,7 @@ module branch_predicter(
     input wire rdy,
 
     //port with IF
-    input wire [`ADDR_TYPE] input_pc,
+    input wire [`ADDR_TYPE] input_pc,//pc 的作用是获取指令所在位置,在bht中选择,下面的 rob_pc 同理
     input wire [`INST_TYPE] input_inst,
     output wire is_jump_flag,
     output wire [`ADDR_TYPE] output_imm, //输出到 IF 的立即数

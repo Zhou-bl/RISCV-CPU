@@ -1,6 +1,8 @@
 //define width
 `define TRUE 1'b1
 `define FALSE 1'b0 
+`define READ_FLAG 1'b0
+`define WRITE_FLAG 1'b1
 
 `define NEXT_PC 32'h4
 `define ADDR_CUT_BP 9:2
@@ -8,7 +10,7 @@
 // vec type
 `define STATUS_TYPE 2:0
 `define INT_TYPE 31:0
-`define MEMPORT_TYPE 7:0
+`define MEMPORT_TYPE 7:0 //io 是1字节
 `define INST_TYPE 31:0
 `define ADDR_TYPE 31:0
 `define DATA_TYPE 31:0
@@ -35,6 +37,12 @@
 `define ZERO_LSB 5'h0
 `define INVALID_LSB 5'h10
 `define ZERO_ROB 4'h0
+
+//cache:
+//because pc is 4 times, so the lowest bits are useless.
+`define ICACHE_TAG_RANGE 31:10//tag to check which inst in this line
+`define ICACHE_INDEX_RANGE 9:2//index detemine line number
+`define ICACHE_SIZE 256//256 lines
 
 //instructions :
 // range
