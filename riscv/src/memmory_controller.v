@@ -46,6 +46,9 @@ reg [`INT_TYPE] ram_access_cnt, ram_access_size; //cnt = 0 时发出了第一个
 //记录当前正在access的字节的位置
 reg [`ADDR_TYPE] ram_access_pc;
 reg [`DATA_TYPE] stored_data;
+wire both_query;
+
+assign both_query = start_access_mem_signal & start_query_signal;
 
 always @(posedge clk) begin
     if (rst) begin
@@ -65,18 +68,21 @@ always @(posedge clk) begin
         finish_rw_flag_to_ls_ex <= `FALSE;
     end
     else begin
-        if ((status != STATUS_IDLE && start_access_mem_signal) || (status != STATUS_IDLE && start_query_signal)) begin
+        if (status != STATUS_IDLE  || (start_query_signal && start_access_mem_signal)) begin
+            //同时来两个信号或者memctrl处于忙碌状态时:
             //buffer the message:
-            if (start_access_mem_signal == `TRUE) begin
+            if (start_query_signal == `FALSE && start_access_mem_signal == `TRUE) begin
+                //此时只有 mem_access 信号
                 buffered_start_access_mem_signal <= `TRUE;
                 buffered_read_or_write_flag_from_ls_ex <= read_or_write_flag_from_ls_ex;
                 buffered_rw_length_from_ls_ex <= rw_length_from_ls_ex;
                 buffered_access_address_from_ls_ex <= access_address_from_ls_ex;
                 buffered_write_data_from_ls_ex <= write_data_from_ls_ex;
             end
-            if (start_query_signal == `TRUE) begin
+            else if (start_query_signal == `TRUE) begin
+                //两种情况：1.两种信号都来；2.在busy时if来信号
                 buffered_start_query_signal <= `TRUE;
-                buffered_pc_from_if <= `TRUE;
+                buffered_pc_from_if <= pc_from_if;
             end
         end
 
@@ -98,7 +104,7 @@ always @(posedge clk) begin
                 if (read_or_write_flag_from_ls_ex == `READ_FLAG) begin
                     ram_access_cnt <= 0;
                     ram_access_size <= rw_length_from_ls_ex;
-                    ram_access_pc <= access_address_from_ls_ex + 1;
+                    ram_access_pc <= access_address_from_ls_ex;
                     access_address_to_ram <= access_address_from_ls_ex;
                     read_or_write_flag_to_ram <= `WRITE_FLAG;
                     status <= STATUS_LOAD;
@@ -117,7 +123,7 @@ always @(posedge clk) begin
                 if (buffered_read_or_write_flag_from_ls_ex == `READ_FLAG) begin
                     ram_access_cnt <= 0;
                     ram_access_size <= buffered_rw_length_from_ls_ex;
-                    ram_access_pc <= buffered_access_address_from_ls_ex + 1;
+                    ram_access_pc <= buffered_access_address_from_ls_ex;
                     access_address_to_ram <= buffered_access_address_from_ls_ex;
                     read_or_write_flag_to_ram <= `READ_FLAG;
                     status <= STATUS_LOAD;
@@ -127,7 +133,7 @@ always @(posedge clk) begin
             else if (buffered_start_query_signal == `TRUE) begin
                 ram_access_cnt <= 0;
                 ram_access_size <= 4;
-                ram_access_pc <= buffered_pc_from_if + 1;
+                ram_access_pc <= buffered_pc_from_if;
                 access_address_to_ram <= buffered_pc_from_if;
                 read_or_write_flag_to_ram <= `READ_FLAG;
                 status <= STATUS_FETCH;
@@ -140,13 +146,16 @@ always @(posedge clk) begin
                     access_address_to_ram <= ram_access_pc;
                     read_or_write_flag_to_ram <= `READ_FLAG;
                     case (ram_access_cnt)
-                        1 : output_inst_to_if[7 : 0] <= input_byte_from_ram;
-                        2 : output_inst_to_if[15 : 8] <= input_byte_from_ram;
-                        3 : output_inst_to_if[23 : 16] <= input_byte_from_ram;
-                        4 : output_inst_to_if[31 : 24] <= input_byte_from_ram;
+                        0 : output_inst_to_if[7 : 0] <= input_byte_from_ram;
+                        1 : output_inst_to_if[15 : 8] <= input_byte_from_ram;
+                        2 : output_inst_to_if[23 : 16] <= input_byte_from_ram;
+                        3 : output_inst_to_if[31 : 24] <= input_byte_from_ram;
                     endcase
-                    ram_access_pc <= (ram_access_cnt >= ram_access_size - 1) ? `ZERO_ADDR : ram_access_pc + 1;
-                    if (ram_access_cnt == ram_access_size) begin
+                    if (ram_access_cnt < ram_access_size - 1) begin
+                        ram_access_pc <= ram_access_pc + 1;
+                    end
+                    //ram_access_pc <= (ram_access_cnt >= ram_access_size - 1) ? `ZERO_ADDR : ram_access_pc + 1;
+                    else if (ram_access_cnt == ram_access_size - 1) begin
                         finish_query_signal <= `TRUE;
                         ram_access_pc <= `ZERO_ADDR;
                         ram_access_cnt <= 0;
@@ -157,13 +166,16 @@ always @(posedge clk) begin
                     access_address_to_ram <= ram_access_pc;
                     read_or_write_flag_to_ram <= `READ_FLAG;
                     case (ram_access_cnt)
-                        1 : load_data_to_ls_ex[7 : 0] <= input_byte_from_ram;
-                        2 : load_data_to_ls_ex[15 : 8] <= input_byte_from_ram;
-                        3 : load_data_to_ls_ex[23 : 16] <= input_byte_from_ram;
-                        4 : load_data_to_ls_ex[31 : 24] <= input_byte_from_ram;
+                        0 : load_data_to_ls_ex[7 : 0] <= input_byte_from_ram;
+                        1 : load_data_to_ls_ex[15 : 8] <= input_byte_from_ram;
+                        2 : load_data_to_ls_ex[23 : 16] <= input_byte_from_ram;
+                        3 : load_data_to_ls_ex[31 : 24] <= input_byte_from_ram;
                     endcase
-                    ram_access_pc <= (ram_access_cnt >= ram_access_size - 1) ? `ZERO_WORD : ram_access_pc + 1;
-                    if (ram_access_cnt == ram_access_size) begin
+                    if (ram_access_cnt < ram_access_size - 1) begin
+                        ram_access_pc <= ram_access_cnt + 1;
+                    end
+                    //ram_access_pc <= (ram_access_cnt >= ram_access_size - 1) ? `ZERO_WORD : ram_access_pc + 1;
+                    else if (ram_access_cnt == ram_access_size - 1) begin
                         finish_rw_flag_to_ls_ex <= `TRUE;
                         ram_access_pc <= `ZERO_WORD;
                         ram_access_cnt <= 0;

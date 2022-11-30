@@ -65,7 +65,7 @@ always @(posedge clk) begin
         ok_to_dsp_signal <= `TRUE;
         inst_to_dsp <= hitted_inst_in_cache;
         pc_to_dsp <= pc;
-        //todo:change pc
+        pc <= pc + (is_jump_flag_from_bp == `TRUE ? imm_from_bp : 4);
     end else begin//not hit or global_full
         if(is_hit_in_cache == `FALSE && fetcher_status == IDLE) begin//访问内存取指令
             fetcher_status <= BUSY;
