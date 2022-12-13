@@ -23,9 +23,9 @@ module dispatcher(
 
     output reg ena_to_rob,
     output reg [`REG_POS_TYPE] rd_to_rob,
-    output reg is_jump_to_rob,
-    output reg is_store_to_rob,
-    output reg predicted_jump_to_rob,
+    output reg is_jump_signal_to_rob,
+    output reg is_store_signal_to_rob,
+    output reg predicted_jump_result_to_rob,
     output reg [`ADDR_TYPE] pc_to_rob,
     input wire [`ROB_ID_TYPE] rob_id_from_rob,
 
@@ -92,8 +92,21 @@ wire [`REG_POS_TYPE] rd_from_decoder;
 wire [`DATA_TYPE] imm_from_decoder;
 wire is_jump_from_decoder;
 wire is_store_from_decoder;
+wire [`ROB_ID_TYPE] Q1, Q2;
+wire [`DATA_TYPE] V1, V2;
+
 assign Q1_to_rob = Q1_from_reg, Q2_to_rob = Q2_from_reg;
 assign rs1_to_reg = rs1_from_decoder, rs2_to_reg = rs2_from_decoder;
 assign Q_to_reg = rob_id_from_rob, rob_id_to_rs = rob_id_from_rob, rob_id_to_lsb = rob_id_from_rob;
+//计算运算数的Q,V:依次从alu\lsu\rob\reg中寻找。
+assign Q1 = (valid_from_rs_cdb && Q1_from_reg == rob_id_from_rs_cdb) ? 
+`ZERO_ROB : ((valid_from_ls_cdb && Q1_from_reg == rob_id_from_ls_cdb) ? 
+`ZERO_ROB : (Q1_ready_from_rob ? 
+`ZERO_ROB : (Q1_from_reg)));
+
+assign Q2 = (valid_from_rs_cdb && Q2_from_reg == rob_id_from_rs_cdb) ?
+`ZERO_ROB : ((valid_from_ls_cdb && Q2_from_reg == rob_id_from_ls_cdb) ? 
+`ZERO_ROB : (Q2_ready_from_rob ? 
+`ZERO_ROB : (Q2_from_reg)));
 
 endmodule
