@@ -150,3 +150,6 @@
 `define OPENUM_SRA     6'd35
 `define OPENUM_OR      6'd36
 `define OPENUM_AND     6'd37
+
+//FOR IO:
+`define RAM_IO_ADDRESS 32'h30000
