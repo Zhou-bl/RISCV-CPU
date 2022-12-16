@@ -13,6 +13,7 @@ module LS_buffer(
     input wire [`ROB_ID_TYPE] Q2_from_dispatcher,
     input wire [`DATA_TYPE] V1_from_dispatcher,
     input wire [`DATA_TYPE] V2_from_dispatcher,
+    input wire [`ROB_ID_TYPE] rob_id_from_dispatcher,
     input wire [`DATA_TYPE] imm_from_dispatcher,
 
     //port with alu:
@@ -23,7 +24,7 @@ module LS_buffer(
     //port with lsu:
     input wire busy_signal_from_lsu,
     input wire valid_signal_from_lsu,
-    input wire [`ROB_ID_TYPE] rob_id_from_lsi,
+    input wire [`ROB_ID_TYPE] rob_id_from_lsu,
     input wire [`DATA_TYPE] result_from_lsu,
     output reg enable_signal_to_lsu,
     output reg [`OPENUM_TYPE] openum_to_lsu,
@@ -41,6 +42,7 @@ module LS_buffer(
 );
 
 //LSB:
+//[head, tail - 1]
 reg [`LSB_ID_TYPE] head, tail, cur_store_index;
 reg [`LSB_SIZE - 1 : 0] LSB_busy;
 reg [`OPENUM_TYPE] LSB_openum [`LSB_SIZE - 1 : 0];
@@ -56,6 +58,21 @@ wire [`LSB_ID_TYPE] next_head, next_tail;
 wire address;
 wire send_to_lsu_signal;
 reg [`ROB_POS_TYPE] LSB_cur_size;
+wire [`ROB_ID_TYPE] updated_Q1, updated_Q2;
+wire [`DATA_TYPE] updated_V1, updated_V2;
+
+assign updated_Q1 = valid_signal_from_alu && rob_id_from_alu == Q1_from_dispatcher ?
+`ZERO_ROB : (valid_signal_from_lsu && Q1_from_dispatcher == rob_id_from_lsu ? 
+`ZERO_ROB : Q1_from_dispatcher);
+assign updated_Q2 = valid_signal_from_alu && rob_id_from_alu == Q2_from_dispatcher ? 
+`ZERO_ROB : (valid_signal_from_lsu && Q2_from_dispatcher == rob_id_from_lsu ? 
+`ZERO_ROB : Q2_from_dispatcher);
+assign updated_V1 = valid_signal_from_alu && rob_id_from_alu == Q1_from_dispatcher ?
+result_from_alu : (valid_signal_from_lsu && rob_id_from_lsu == Q2_from_dispatcher ? 
+result_from_lsu : V1_from_dispatcher);
+assign updated_V2 = valid_signal_from_alu && rob_id_from_alu == Q1_from_dispatcher ? 
+result_from_alu : (valid_signal_from_lsu && rob_id_from_lsu == Q2_from_dispatcher ?
+result_from_lsu : V2_from_dispatcher);
 
 
 assign full_signal = (LSB_cur_size >= `LSB_SIZE - 3);
@@ -81,6 +98,94 @@ always @(posedge clk) begin
             LSB_V1[i] <= `ZERO_WORD;
             LSB_V2[i] <= `ZERO_WORD;
             LSB_rob_id[i] <= `ZERO_ROB; 
+        end
+        LSB_cur_size <= `ZERO_WORD;
+        head <= `ZERO_LSB; tail <= `ZERO_ROB;
+        enable_signal_to_lsu <= `FALSE;
+    end else if(~rdy) begin
+    end else begin
+        //1.将新的指令放入LSB中
+        //2.将head所在的指令传给LSU
+        //3.监听CDB总线更新LSB中的信息
+        enable_signal_to_lsu <= `FALSE;
+        LSB_cur_size <= LSB_cur_size - send_to_lsu_signal + enable_signal_from_dispatcher;
+        if(enable_signal_from_dispatcher == `TRUE) begin
+            LSB_busy[tail] <= `TRUE;
+            LSB_openum[tail] <= openum_from_dispatcher;
+            LSB_imm[tail] <= imm_from_dispatcher;
+            LSB_Q1[tail] <= updated_Q1;
+            LSB_Q2[tail] <= updated_Q2;
+            LSB_V1[tail] <= updated_V1;
+            LSB_V2[tail] <= updated_V2;
+            LSB_rob_id[tail] <= rob_id_from_dispatcher;
+            LSB_is_committed[tail] <= `FALSE;
+            tail <= next_tail;
+        end
+
+        if(send_to_lsu_signal) begin
+            if (openum_from_dispatcher <= `OPENUM_LHU) begin
+                //load:
+                //clear LSB[head]:
+                LSB_busy[head] <= `FALSE;
+                LSB_rob_id[head] <= `ZERO_ROB;
+                LSB_is_committed[head] <= `FALSE;
+                LSB_imm[head] <= `ZERO_WORD;
+                LSB_openum[head] <= `OPENUM_NOP;
+                LSB_Q1[head] <= `ZERO_ROB;
+                LSB_Q2[head] <= `ZERO_ROB;
+                LSB_V1[head] <= `ZERO_WORD;
+                LSB_V2[head] <= `ZERO_WORD;
+                //send information to lsu:
+                enable_signal_to_lsu <= `TRUE;
+                openum_to_lsu <= LSB_openum[head];
+                mem_address_to_lsu <= LSB_imm[head] + LSB_V1[head];
+                stored_data <= `ZERO_WORD;
+                head <= next_head;
+            end
+            else begin
+                //store:
+                //clear LSB[head]:
+                LSB_busy[head] <= `FALSE;
+                LSB_rob_id[head] <= `ZERO_ROB;
+                LSB_is_committed[head] <= `FALSE;
+                LSB_imm[head] <= `ZERO_WORD;
+                LSB_openum[head] <= `OPENUM_NOP;
+                LSB_Q1[head] <= `ZERO_ROB;
+                LSB_Q2[head] <= `ZERO_ROB;
+                LSB_V1[head] <= `ZERO_WORD;
+                LSB_V2[head] <= `ZERO_WORD;
+                //send information to lsu:
+                enable_signal_to_lsu <= `TRUE;
+                openum_to_lsu <= LSB_openum[head];
+                mem_address_to_lsu <= LSB_imm[head] + LSB_V1[head];
+                stored_data <= LSB_V2[head];
+                head <= next_head;
+            end
+        end
+
+        if(valid_signal_from_alu) begin
+            for(i = 0; i <= 15; i = i + 1) begin
+                if(LSB_Q1[i] == rob_id_from_alu) begin
+                    LSB_Q1[i] <= `ZERO_ROB;
+                    LSB_V1[i] <= result_from_alu;
+                end
+                if(LSB_Q2[i] == rob_id_from_alu) begin
+                    LSB_Q2[i] <= `ZERO_ROB;
+                    LSB_V2[i] <= result_from_alu;
+                end
+            end
+        end
+        if(valid_signal_from_lsu) begin
+            for(i = 0 ; i <= 15; i = i + 1) begin
+                if(LSB_Q1[i] == rob_id_from_lsu) begin
+                    LSB_Q1[i] <= `ZERO_ROB;
+                    LSB_V1[i] <= result_from_lsu;
+                end
+                if(LSB_Q2[i]  == rob_id_from_lsu) begin
+                    LSB_Q2[i] <= `ZERO_ROB;
+                    LSB_V2[i] <= result_from_lsu;
+                end    
+            end
         end
     end
 end
