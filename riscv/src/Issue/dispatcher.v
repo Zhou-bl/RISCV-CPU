@@ -66,15 +66,15 @@ module dispatcher(
 
     //port with rs cdb
     //接受来自cdb的rs信息
-    input wire valid_from_rs_cdb,
-    input wire [`ROB_ID_TYPE] rob_id_from_rs_cdb,
-    input wire [`DATA_TYPE] result_from_rs_cdb,
+    input wire valid_from_Arith_unit_cdb,
+    input wire [`ROB_ID_TYPE] rob_id_from_Arith_unit_cdb,
+    input wire [`DATA_TYPE] result_from_Arith_unit_cdb,
 
     //port with ls cdb
     //接受来自cdb的ls信息
-    input wire valid_from_ls_cdb,
-    input wire [`ROB_ID_TYPE] rob_id_from_ls_cdb,
-    input wire [`DATA_TYPE] result_from_ls_cdb
+    input wire valid_from_LS_unit_cdb,
+    input wire [`ROB_ID_TYPE] rob_id_from_LS_unit_cdb,
+    input wire [`DATA_TYPE] result_from_LS_unit_cdb
 );
 //internal data:
 wire [`OPENUM_TYPE] openum_from_decoder;
@@ -99,13 +99,13 @@ decoder internal_decoder(
 );
 
 data_forwarding internal_data_forwarding(
-    .valid_from_rs_cdb(valid_from_rs_cdb),
-    .rob_id_from_rs_cdb(rob_id_from_rs_cdb),
-    .result_from_rs_cdb(result_from_rs_cdb),
+    .valid_from_Arith_unit_cdb(valid_from_Arith_unit_cdb),
+    .rob_id_from_Arith_unit_cdb(rob_id_from_Arith_unit_cdb),
+    .result_from_Arith_unit_cdb(result_from_Arith_unit_cdb),
 
-    .valid_from_ls_cdb(valid_from_ls_cdb),
-    .rob_id_from_ls_cdb(rob_id_from_ls_cdb),
-    .result_from_ls_cdb(result_from_ls_cdb),
+    .valid_from_LS_unit_cdb(valid_from_LS_unit_cdb),
+    .rob_id_from_LS_unit_cdb(rob_id_from_LS_unit_cdb),
+    .result_from_LS_unit_cdb(result_from_LS_unit_cdb),
 
     .Q1_ready_from_rob(Q1_ready_from_rob),
     .Q2_ready_from_rob(Q2_ready_from_rob),

@@ -20,16 +20,17 @@ module reserve_station(
     output reg [`DATA_TYPE] V1_to_alu,
     output reg [`DATA_TYPE] V2_to_alu,
     output reg [`DATA_TYPE] imm_to_alu,
-    output reg [`DATA_TYPE] pc_to_alu,
+    output reg [`ADDR_TYPE] pc_to_alu,
 
     //port with cdb:
-    input wire valid_signal_from_alu,
-    input wire [`ROB_ID_TYPE] rob_id_from_alu,
-    input wire [`DATA_TYPE] result_from_alu,
-    input wire valid_signal_from_lsu,
-    input wire [`ROB_ID_TYPE] rob_id_from_lsu,
-    input wire [`DATA_TYPE] result_from_lsu,
-    output reg [`ROB_ID_TYPE] rob_id_to_cdb,
+    input wire valid_signal_from_Arith_unit_cdb,
+    input wire [`ROB_ID_TYPE] rob_id_from_Arith_unit_cdb,
+    input wire [`DATA_TYPE] result_from_Arith_unit_cdb,
+    output reg [`ROB_ID_TYPE] rob_id_to_Arith_unit_cdb,
+
+    input wire valid_signal_from_LS_unit_cdb,
+    input wire [`ROB_ID_TYPE] rob_id_from_LS_unit_cdb,
+    input wire [`DATA_TYPE] result_from_LS_unit_cdb,
 
     //full signal:
     output wire full_signal
@@ -55,21 +56,21 @@ wire [`DATA_TYPE] updated_V1, updated_V2;
 
 //更新最新的Q1,Q2,V1,V2:
 //因为某条指令j在dispatch中时，它的上一条指令i在RS中，当j在RS中时，i在ALU中计算出来了结果，需要对其更新
-assign updated_Q1 = (valid_signal_from_alu && Q1_from_dispatcher == rob_id_from_alu) ? 
-`ZERO_ROB : ((valid_signal_from_lsu && Q1_from_dispatcher == rob_id_from_lsu) ? 
+assign updated_Q1 = (valid_signal_from_Arith_unit_cdb && Q1_from_dispatcher == rob_id_from_Arith_unit_cdb) ? 
+`ZERO_ROB : ((valid_signal_from_LS_unit_cdb && Q1_from_dispatcher == rob_id_from_LS_unit_cdb) ? 
 `ZERO_ROB : Q1_from_dispatcher);
 
-assign updated_Q2 = (valid_signal_from_alu && Q2_from_dispatcher == rob_id_from_alu) ? 
-`ZERO_ROB : ((valid_signal_from_lsu && Q2_from_dispatcher == rob_id_from_lsu) ? 
+assign updated_Q2 = (valid_signal_from_Arith_unit_cdb && Q2_from_dispatcher == rob_id_from_Arith_unit_cdb) ? 
+`ZERO_ROB : ((valid_signal_from_LS_unit_cdb && Q2_from_dispatcher == rob_id_from_LS_unit_cdb) ? 
 `ZERO_ROB : Q2_from_dispatcher);
 
-assign updated_V1 = (valid_signal_from_alu && Q1_from_dispatcher == rob_id_from_alu) ?
-result_from_alu : ((valid_signal_from_lsu && Q1_from_dispatcher == rob_id_from_lsu ?
-result_from_lsu : V1_from_dispatcher));
+assign updated_V1 = (valid_signal_from_Arith_unit_cdb && Q1_from_dispatcher == rob_id_from_Arith_unit_cdb) ?
+result_from_Arith_unit_cdb : ((valid_signal_from_LS_unit_cdb && Q1_from_dispatcher == rob_id_from_LS_unit_cdb ?
+result_from_LS_unit_cdb : V1_from_dispatcher));
 
-assign updated_V2 = (valid_signal_from_alu && Q2_from_dispatcher == rob_id_from_alu) ?
-result_from_alu : ((valid_signal_from_lsu && Q2_from_dispatcher == rob_id_from_lsu) ? 
-result_from_lsu : V2_from_dispatcher);
+assign updated_V2 = (valid_signal_from_Arith_unit_cdb && Q2_from_dispatcher == rob_id_from_Arith_unit_cdb) ?
+result_from_Arith_unit_cdb : ((valid_signal_from_LS_unit_cdb && Q2_from_dispatcher == rob_id_from_LS_unit_cdb) ? 
+result_from_LS_unit_cdb : V2_from_dispatcher);
 
 //利用状态机的思想寻找空闲的位置：
 assign free_index = 
@@ -106,7 +107,7 @@ assign next_to_alu_index =
 (RS_busy[10] && RS_Q1[10] == `ZERO_ROB && RS_Q2[10] == `ZERO_ROB ? 10 :
 (RS_busy[11] && RS_Q1[11] == `ZERO_ROB && RS_Q2[11] == `ZERO_ROB ? 11 :
 (RS_busy[12] && RS_Q1[12] == `ZERO_ROB && RS_Q2[12] == `ZERO_ROB ? 12 :
-(RS_busy[13] && RS_Q1[13] == `ZERO_ROB && RS_Q2[13] == `ZERO_ROB ? 13 : 
+(RS_busy[13] && RS_Q1[13] == `ZERO_ROB && RS_Q2[13] == `ZERO_ROB ? 13 :
 (RS_busy[14] && RS_Q1[14] == `ZERO_ROB && RS_Q2[14] == `ZERO_ROB ? 14 :
 (RS_busy[15] && RS_Q1[15] == `ZERO_ROB && RS_Q2[15] == `ZERO_ROB ? 15 :
 (`INVALID_RS)))))))))))))))));
@@ -130,27 +131,27 @@ always @(posedge clk) begin
         //2.将从dispatcher传入的指令放入RS中
         //3.将next_to_alu_index所在的指令传到alu中
 
-        if(valid_signal_from_alu == `TRUE) begin
+        if(valid_signal_from_Arith_unit_cdb == `TRUE) begin
             for(i = 0; i <= 15; i = i + 1) begin
-                if(RS_Q1[i] == rob_id_from_alu) begin
+                if(RS_Q1[i] == rob_id_from_Arith_unit_cdb) begin
                     RS_Q1[i] <= `ZERO_ROB;
-                    RS_V1[i] <= result_from_alu;
+                    RS_V1[i] <= result_from_Arith_unit_cdb;
                 end
-                if(RS_Q2[i] == rob_id_from_alu) begin
+                if(RS_Q2[i] == rob_id_from_Arith_unit_cdb) begin
                     RS_Q2[i] <= `ZERO_ROB;
-                    RS_V2[i] <= result_from_alu;
+                    RS_V2[i] <= result_from_Arith_unit_cdb;
                 end
             end
         end
-        if(valid_signal_from_lsu == `TRUE) begin
+        if(valid_signal_from_LS_unit_cdb == `TRUE) begin
             for(i = 0; i <= 15; i = i + 1) begin
-                if(RS_Q1[i] == rob_id_from_lsu) begin
+                if(RS_Q1[i] == rob_id_from_LS_unit_cdb) begin
                     RS_Q1[i] <= `ZERO_ROB;
-                    RS_V1[i] <= result_from_lsu;
+                    RS_V1[i] <= result_from_LS_unit_cdb;
                 end
-                if(RS_Q2[2] == rob_id_from_lsu) begin
+                if(RS_Q2[2] == rob_id_from_LS_unit_cdb) begin
                     RS_Q2[i] <= `ZERO_ROB;
-                    RS_V2[i] <= result_from_lsu;
+                    RS_V2[i] <= result_from_LS_unit_cdb;
                 end
             end
         end
@@ -171,7 +172,7 @@ always @(posedge clk) begin
             openum_to_alu <= `OPENUM_NOP;
         end else begin
             openum_to_alu <= openum_from_dispatcher;
-            rob_id_to_cdb <= RS_rob_id[next_to_alu_index];
+            rob_id_to_Arith_unit_cdb <= RS_rob_id[next_to_alu_index];
             RS_busy[next_to_alu_index] <= `FALSE;
             V1_to_alu <= RS_V1[next_to_alu_index];
             V2_to_alu <= RS_V2[next_to_alu_index];

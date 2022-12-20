@@ -16,16 +16,18 @@ module LS_buffer(
     input wire [`ROB_ID_TYPE] rob_id_from_dispatcher,
     input wire [`DATA_TYPE] imm_from_dispatcher,
 
-    //port with alu:
-    input wire valid_signal_from_alu,
-    input wire [`ROB_ID_TYPE] rob_id_from_alu,
-    input wire [`DATA_TYPE] result_from_alu,
+    //port with Arith_unit cdb:
+    input wire valid_signal_from_Arith_unit_cdb,
+    input wire [`ROB_ID_TYPE] rob_id_from_Arith_unit_cdb,
+    input wire [`DATA_TYPE] result_from_Arith_unit_cdb,
  
+    //port with LS_unit cdb:
+    input wire valid_signal_from_LS_unit_cdb,
+    input wire [`ROB_ID_TYPE] rob_id_from_LS_unit_cdb,
+    input wire [`DATA_TYPE] result_from_LS_unit_cdb,
+    
     //port with lsu:
     input wire busy_signal_from_lsu,
-    input wire valid_signal_from_lsu,
-    input wire [`ROB_ID_TYPE] rob_id_from_lsu,
-    input wire [`DATA_TYPE] result_from_lsu,
     output reg enable_signal_to_lsu,
     output reg [`OPENUM_TYPE] openum_to_lsu,
     output reg [`ADDR_TYPE] mem_address_to_lsu,
@@ -61,18 +63,18 @@ reg [`ROB_POS_TYPE] LSB_cur_size;
 wire [`ROB_ID_TYPE] updated_Q1, updated_Q2;
 wire [`DATA_TYPE] updated_V1, updated_V2;
 
-assign updated_Q1 = valid_signal_from_alu && rob_id_from_alu == Q1_from_dispatcher ?
-`ZERO_ROB : (valid_signal_from_lsu && Q1_from_dispatcher == rob_id_from_lsu ? 
+assign updated_Q1 = valid_signal_from_Arith_unit_cdb && rob_id_from_Arith_unit_cdb == Q1_from_dispatcher ?
+`ZERO_ROB : (valid_signal_from_LS_unit_cdb && Q1_from_dispatcher == rob_id_from_LS_unit_cdb ? 
 `ZERO_ROB : Q1_from_dispatcher);
-assign updated_Q2 = valid_signal_from_alu && rob_id_from_alu == Q2_from_dispatcher ? 
-`ZERO_ROB : (valid_signal_from_lsu && Q2_from_dispatcher == rob_id_from_lsu ? 
+assign updated_Q2 = valid_signal_from_Arith_unit_cdb && rob_id_from_Arith_unit_cdb == Q2_from_dispatcher ? 
+`ZERO_ROB : (valid_signal_from_LS_unit_cdb && Q2_from_dispatcher == rob_id_from_LS_unit_cdb ? 
 `ZERO_ROB : Q2_from_dispatcher);
-assign updated_V1 = valid_signal_from_alu && rob_id_from_alu == Q1_from_dispatcher ?
-result_from_alu : (valid_signal_from_lsu && rob_id_from_lsu == Q2_from_dispatcher ? 
-result_from_lsu : V1_from_dispatcher);
-assign updated_V2 = valid_signal_from_alu && rob_id_from_alu == Q1_from_dispatcher ? 
-result_from_alu : (valid_signal_from_lsu && rob_id_from_lsu == Q2_from_dispatcher ?
-result_from_lsu : V2_from_dispatcher);
+assign updated_V1 = valid_signal_from_Arith_unit_cdb && rob_id_from_Arith_unit_cdb == Q1_from_dispatcher ?
+result_from_Arith_unit_cdb : (valid_signal_from_LS_unit_cdb && rob_id_from_LS_unit_cdb == Q2_from_dispatcher ? 
+result_from_LS_unit_cdb : V1_from_dispatcher);
+assign updated_V2 = valid_signal_from_Arith_unit_cdb && rob_id_from_Arith_unit_cdb == Q1_from_dispatcher ? 
+result_from_Arith_unit_cdb : (valid_signal_from_LS_unit_cdb && rob_id_from_LS_unit_cdb == Q2_from_dispatcher ?
+result_from_LS_unit_cdb : V2_from_dispatcher);
 
 
 assign full_signal = (LSB_cur_size >= `LSB_SIZE - 3);
@@ -163,27 +165,27 @@ always @(posedge clk) begin
             end
         end
 
-        if(valid_signal_from_alu) begin
+        if(valid_signal_from_Arith_unit_cdb) begin
             for(i = 0; i <= 15; i = i + 1) begin
-                if(LSB_Q1[i] == rob_id_from_alu) begin
+                if(LSB_Q1[i] == rob_id_from_Arith_unit_cdb) begin
                     LSB_Q1[i] <= `ZERO_ROB;
-                    LSB_V1[i] <= result_from_alu;
+                    LSB_V1[i] <= result_from_Arith_unit_cdb;
                 end
-                if(LSB_Q2[i] == rob_id_from_alu) begin
+                if(LSB_Q2[i] == rob_id_from_Arith_unit_cdb) begin
                     LSB_Q2[i] <= `ZERO_ROB;
-                    LSB_V2[i] <= result_from_alu;
+                    LSB_V2[i] <= result_from_Arith_unit_cdb;
                 end
             end
         end
-        if(valid_signal_from_lsu) begin
+        if(valid_signal_from_LS_unit_cdb) begin
             for(i = 0 ; i <= 15; i = i + 1) begin
-                if(LSB_Q1[i] == rob_id_from_lsu) begin
+                if(LSB_Q1[i] == rob_id_from_LS_unit_cdb) begin
                     LSB_Q1[i] <= `ZERO_ROB;
-                    LSB_V1[i] <= result_from_lsu;
+                    LSB_V1[i] <= result_from_LS_unit_cdb;
                 end
-                if(LSB_Q2[i]  == rob_id_from_lsu) begin
+                if(LSB_Q2[i]  == rob_id_from_LS_unit_cdb) begin
                     LSB_Q2[i] <= `ZERO_ROB;
-                    LSB_V2[i] <= result_from_lsu;
+                    LSB_V2[i] <= result_from_LS_unit_cdb;
                 end    
             end
         end

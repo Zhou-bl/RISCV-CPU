@@ -14,15 +14,16 @@ module fetcher(
     output reg[`ADDR_TYPE] query_pc,
 
     //port with branch_predicter:
-    input wire is_jump_flag_from_bp,
-    input wire [`ADDR_TYPE] imm_from_bp,
+    input wire predicted_jump_flag_from_bp,
+    input wire [`ADDR_TYPE] predicted_imm_from_bp,
     output wire [`ADDR_TYPE] pc_to_bp,
     output wire [`INST_TYPE] inst_to_bp,
 
     //port with dispatcher:
     output reg ok_to_dsp_signal,//一个脉冲信号
     output reg [`INST_TYPE] inst_to_dsp,
-    output reg [`ADDR_TYPE] pc_to_dsp
+    output reg [`ADDR_TYPE] pc_to_dsp,
+    output reg predicted_jump_to_dsp
 );
 
 localparam IDLE = 0, BUSY = 1; //busy : is querying inst from memCtrl
@@ -65,7 +66,8 @@ always @(posedge clk) begin
         ok_to_dsp_signal <= `TRUE;
         inst_to_dsp <= hitted_inst_in_cache;
         pc_to_dsp <= pc;
-        pc <= pc + (is_jump_flag_from_bp == `TRUE ? imm_from_bp : 4);
+        predicted_jump_to_dsp <= predicted_jump_flag_from_bp;
+        pc <= pc + (predicted_jump_flag_from_bp == `TRUE ? predicted_imm_from_bp : 4);
     end else begin//not hit or global_full
         if(is_hit_in_cache == `FALSE && fetcher_status == IDLE) begin//访问内存取指令
             fetcher_status <= BUSY;
