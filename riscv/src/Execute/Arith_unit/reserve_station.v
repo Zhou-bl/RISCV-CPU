@@ -33,7 +33,8 @@ module reserve_station(
     input wire [`DATA_TYPE] result_from_LS_unit_cdb,
 
     //full signal:
-    output wire full_signal
+    output wire full_signal,
+    input wire misbranch_flag
 );
 // 16-size reserve station:
 reg [`RS_SIZE - 1 : 0] RS_busy;

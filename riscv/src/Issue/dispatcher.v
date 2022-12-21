@@ -74,7 +74,8 @@ module dispatcher(
     //接受来自cdb的ls信息
     input wire valid_from_LS_unit_cdb,
     input wire [`ROB_ID_TYPE] rob_id_from_LS_unit_cdb,
-    input wire [`DATA_TYPE] result_from_LS_unit_cdb
+    input wire [`DATA_TYPE] result_from_LS_unit_cdb,
+    input wire misbranch_flag
 );
 //internal data:
 wire [`OPENUM_TYPE] openum_from_decoder;

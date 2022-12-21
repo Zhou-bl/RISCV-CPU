@@ -40,7 +40,8 @@ module LS_buffer(
     input wire [`ROB_ID_TYPE] io_rob_id_from_rob,
     output wire [`ROB_ID_TYPE] io_rob_id_to_rob,
 
-    output wire full_signal
+    output wire full_signal,
+    input wire misbranch_flag
 );
 
 //LSB:

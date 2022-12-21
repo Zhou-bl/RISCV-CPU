@@ -23,7 +23,8 @@ module lsu(
 
     //port to cdb:
     output reg valid_signal_to_cdb,
-    output reg [`DATA_TYPE] result_to_cdb
+    output reg [`DATA_TYPE] result_to_cdb,
+    input wire misbranch_flag
 );
 
 localparam STATUS_IDLE = 0, STATUS_LB = 1, STATUS_LH = 2, STATUS_LW = 3,

@@ -238,7 +238,8 @@ dispatcher CPU_dispatcher(
   //port with LS_unit cdb:
   .valid_from_LS_unit_cdb(LS_unit_valid_signal),
   .rob_id_from_LS_unit_cdb(LS_unit_rob_id),
-  .result_from_LS_unit_cdb(LS_unit_result)
+  .result_from_LS_unit_cdb(LS_unit_result),
+  .misbranch_flag(misbranch_flag_cdb)
 );
 
 reserve_station CPU_reserve_station(
@@ -275,7 +276,8 @@ reserve_station CPU_reserve_station(
   .rob_id_from_LS_unit_cdb(LS_unit_rob_id),
   .result_from_LS_unit_cdb(LS_unit_result),
 
-  .full_signal(RS_full_signal)
+  .full_signal(RS_full_signal),
+  .misbranch_flag(misbranch_flag_cdb)
 );
 
 //for LSB port with lsu:
@@ -328,7 +330,8 @@ LS_buffer CPU_LS_buffer(
   .io_rob_id_from_rob(io_rob_id_from_ROB_to_LSB),
   .io_rob_id_to_rob(io_rob_id_from_LSB_to_ROB),
 
-  .full_signal(LSB_full_signal)
+  .full_signal(LSB_full_signal),
+  .misbranch_flag(misbranch_flag_cdb)
 );
 
 alu CPU_alu(
@@ -375,7 +378,8 @@ lsu CPU_lsu(
   
   //port with LS_unit cdb:
   .valid_signal_to_cdb(LS_unit_valid_signal),
-  .result_to_cdb(LS_unit_result)
+  .result_to_cdb(LS_unit_result),
+  .misbranch_flag(misbranch_flag_cdb)
 );
 
 wire [`REG_POS_TYPE] rd_from_ROB_to_REG;
