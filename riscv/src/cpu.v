@@ -1,20 +1,8 @@
 // RISCV32I CPU top module
 // port modification allowed for debugging purposes
 
-`include "/Users/zbl/Desktop/RISCV-CPU/riscv/src/constant.v"
-//Issue:
-`include "/Users/zbl/Desktop/RISCV-CPU/riscv/src/Issue/instruction_fetcher.v"
-`include "/Users/zbl/Desktop/RISCV-CPU/riscv/src/Issue/dispatcher.v"
-`include "/Users/zbl/Desktop/RISCV-CPU/riscv/src/Issue/branch_predicter.v"
-//Execute:
-`include "/Users/zbl/Desktop/RISCV-CPU/riscv/src/Execute/Arith_unit/reserve_station.v"
-`include "/Users/zbl/Desktop/RISCV-CPU/riscv/src/Execute/Arith_unit/alu.v"
-`include "/Users/zbl/Desktop/RISCV-CPU/riscv/src/Execute/LS_unit/LS_buffer.v"
-`include "/Users/zbl/Desktop/RISCV-CPU/riscv/src/Execute/LS_unit/lsu.v"
-//Commit:
-`include "/Users/zbl/Desktop/RISCV-CPU/riscv/src/Commit/reorder_buffer.v"
-`include "/Users/zbl/Desktop/RISCV-CPU/riscv/src/Commit/register_file.v"
-`include "/Users/zbl/Desktop/RISCV-CPU/riscv/src/Commit/memory_controller.v"
+`include "/mnt/c/Users/zbl/Desktop/RISCV-CPU/riscv/src/constant.v"
+
 
 module cpu(
   input  wire                 clk_in,			// system clock signal
@@ -60,6 +48,7 @@ wire [`ADDR_TYPE] pc_between_if_and_dispatcher;
 wire predicted_jump_flag_between_if_and_dispatcher;
 wire [`ADDR_TYPE] rollback_if_and_dispatcher;
 wire [`ADDR_TYPE] target_pc_from_ROB_to_if;
+wire misbranch_flag_cdb;
 fetcher CPU_fetcher(
   .clk(clk_in),
   .rst(rst_in),
@@ -161,6 +150,26 @@ wire [`ROB_ID_TYPE] Q2_between_dispatcher_and_LSB;
 wire [`DATA_TYPE] imm_between_dispatcher_and_LSB;
 wire [`ROB_ID_TYPE] rob_id_between_dispatcher_and_LSB;
 
+//Arith unit cdb:
+wire Arith_unit_valid_signal;
+wire [`ROB_ID_TYPE] Arith_unit_rob_id;
+wire [`DATA_TYPE] Arith_unit_result;
+wire [`ADDR_TYPE] Arith_unit_target_pc;
+wire Arith_unit_precise_jump_flag;
+//LS unit cdb:
+wire LS_unit_valid_signal;
+wire [`ROB_ID_TYPE] LS_unit_rob_id;
+wire [`DATA_TYPE] LS_unit_result;
+//for RS port with alu:
+wire [`OPENUM_TYPE] openum_between_RS_and_alu;
+wire [`DATA_TYPE] V1_between_RS_and_alu;
+wire [`DATA_TYPE] V2_between_RS_and_alu;
+wire [`DATA_TYPE] imm_between_RS_and_alu;
+wire [`ADDR_TYPE] pc_between_RS_and_alu;
+
+//commit cdb:
+wire ROB_commit_signal_cdb;
+
 dispatcher CPU_dispatcher(
   .clk(clk_in),
   .rst(rst_in),
@@ -231,23 +240,6 @@ dispatcher CPU_dispatcher(
   .rob_id_from_LS_unit_cdb(LS_unit_rob_id),
   .result_from_LS_unit_cdb(LS_unit_result)
 );
-
-//Arith unit cdb:
-wire Arith_unit_valid_signal;
-wire [`ROB_ID_TYPE] Arith_unit_rob_id;
-wire [`DATA_TYPE] Arith_unit_result;
-wire [`ADDR_TYPE] Arith_unit_target_pc;
-wire Arith_unit_precise_jump_flag;
-//LS unit cdb:
-wire LS_unit_valid_signal;
-wire [`ROB_ID_TYPE] LS_unit_rob_id;
-wire [`DATA_TYPE] LS_unit_result;
-//for RS port with alu:
-wire [`OPENUM_TYPE] openum_between_RS_and_alu;
-wire [`DATA_TYPE] V1_between_RS_and_alu;
-wire [`DATA_TYPE] V2_between_RS_and_alu;
-wire [`DATA_TYPE] imm_between_RS_and_alu;
-wire [`ADDR_TYPE] pc_between_RS_and_alu;
 
 reserve_station CPU_reserve_station(
   .clk(clk_in),
@@ -338,9 +330,6 @@ LS_buffer CPU_LS_buffer(
 
   .full_signal(LSB_full_signal)
 );
-
-//commit cdb:
-wire ROB_commit_signal_cdb;
 
 alu CPU_alu(
   .input_openum(openum_between_RS_and_alu),
@@ -449,8 +438,6 @@ reorder_buffer CPU_reorder_buffer(
 
   .full_signal(ROB_full_signal)    
 );
-
-wire misbranch_flag_cdb;
 
 register_file CPU_register_file(
   .clk(clk_in),

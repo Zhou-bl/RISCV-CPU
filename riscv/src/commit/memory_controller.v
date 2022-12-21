@@ -1,4 +1,4 @@
-`include "/Users/zbl/Desktop/RISCV-CPU/riscv/src/constant.v"
+`include "/mnt/c/Users/zbl/Desktop/RISCV-CPU/riscv/src/constant.v"
 module memory_controller(
     input wire clk,
     input wire rst,
@@ -43,7 +43,7 @@ reg [`DATA_TYPE] buffered_write_data_from_ls_ex;
 reg [`STATUS_TYPE] status;
 //记录当前正在access第几个字节，总共需要access多少字节
 reg [`INT_TYPE] ram_access_cnt, ram_access_size; //cnt = 0 时发出了第一个字节的请求, cnt = ran_access_size - 1 时发出了最后一个字节的请求
-//记录当前正在access的字节的位置
+//记录下一个access的字节的位置
 reg [`ADDR_TYPE] ram_access_pc;
 reg [`DATA_TYPE] stored_data;
 wire both_query;
@@ -104,9 +104,9 @@ always @(posedge clk) begin
                 if (read_or_write_flag_from_ls_ex == `READ_FLAG) begin
                     ram_access_cnt <= 0;
                     ram_access_size <= rw_length_from_ls_ex;
-                    ram_access_pc <= access_address_from_ls_ex;
+                    ram_access_pc <= access_address_from_ls_ex + 1;
                     access_address_to_ram <= access_address_from_ls_ex;
-                    read_or_write_flag_to_ram <= `WRITE_FLAG;
+                    read_or_write_flag_to_ram <= `READ_FLAG;
                     status <= STATUS_LOAD;
                 end
             end
@@ -123,17 +123,25 @@ always @(posedge clk) begin
                 if (buffered_read_or_write_flag_from_ls_ex == `READ_FLAG) begin
                     ram_access_cnt <= 0;
                     ram_access_size <= buffered_rw_length_from_ls_ex;
-                    ram_access_pc <= buffered_access_address_from_ls_ex;
+                    ram_access_pc <= buffered_access_address_from_ls_ex + 1;
                     access_address_to_ram <= buffered_access_address_from_ls_ex;
                     read_or_write_flag_to_ram <= `READ_FLAG;
                     status <= STATUS_LOAD;
                 end
                 buffered_start_access_mem_signal <= `FALSE;
             end
+            else if(start_query_signal == `TRUE) begin
+                ram_access_cnt <= 0;
+                ram_access_size <= 4;
+                ram_access_pc <= pc_from_if + 1;
+                access_address_to_ram <= pc_from_if;
+                read_or_write_flag_to_ram <= `READ_FLAG;
+                status <= STATUS_FETCH;
+            end
             else if (buffered_start_query_signal == `TRUE) begin
                 ram_access_cnt <= 0;
                 ram_access_size <= 4;
-                ram_access_pc <= buffered_pc_from_if;
+                ram_access_pc <= buffered_pc_from_if + 1;
                 access_address_to_ram <= buffered_pc_from_if;
                 read_or_write_flag_to_ram <= `READ_FLAG;
                 status <= STATUS_FETCH;
@@ -146,16 +154,16 @@ always @(posedge clk) begin
                     access_address_to_ram <= ram_access_pc;
                     read_or_write_flag_to_ram <= `READ_FLAG;
                     case (ram_access_cnt)
-                        0 : output_inst_to_if[7 : 0] <= input_byte_from_ram;
-                        1 : output_inst_to_if[15 : 8] <= input_byte_from_ram;
-                        2 : output_inst_to_if[23 : 16] <= input_byte_from_ram;
-                        3 : output_inst_to_if[31 : 24] <= input_byte_from_ram;
+                        1 : output_inst_to_if[7 : 0] <= input_byte_from_ram;
+                        2 : output_inst_to_if[15 : 8] <= input_byte_from_ram;
+                        3 : output_inst_to_if[23 : 16] <= input_byte_from_ram;
+                        4 : output_inst_to_if[31 : 24] <= input_byte_from_ram;
                     endcase
                     if (ram_access_cnt < ram_access_size - 1) begin
                         ram_access_pc <= ram_access_pc + 1;
                     end
                     //ram_access_pc <= (ram_access_cnt >= ram_access_size - 1) ? `ZERO_ADDR : ram_access_pc + 1;
-                    else if (ram_access_cnt == ram_access_size - 1) begin
+                    if (ram_access_cnt == ram_access_size) begin
                         finish_query_signal <= `TRUE;
                         ram_access_pc <= `ZERO_ADDR;
                         ram_access_cnt <= 0;
@@ -166,16 +174,16 @@ always @(posedge clk) begin
                     access_address_to_ram <= ram_access_pc;
                     read_or_write_flag_to_ram <= `READ_FLAG;
                     case (ram_access_cnt)
-                        0 : load_data_to_ls_ex[7 : 0] <= input_byte_from_ram;
-                        1 : load_data_to_ls_ex[15 : 8] <= input_byte_from_ram;
-                        2 : load_data_to_ls_ex[23 : 16] <= input_byte_from_ram;
-                        3 : load_data_to_ls_ex[31 : 24] <= input_byte_from_ram;
+                        1 : load_data_to_ls_ex[7 : 0] <= input_byte_from_ram;
+                        2 : load_data_to_ls_ex[15 : 8] <= input_byte_from_ram;
+                        3 : load_data_to_ls_ex[23 : 16] <= input_byte_from_ram;
+                        4 : load_data_to_ls_ex[31 : 24] <= input_byte_from_ram;
                     endcase
                     if (ram_access_cnt < ram_access_size - 1) begin
-                        ram_access_pc <= ram_access_cnt + 1;
+                        ram_access_pc <= ram_access_pc + 1;
                     end
                     //ram_access_pc <= (ram_access_cnt >= ram_access_size - 1) ? `ZERO_WORD : ram_access_pc + 1;
-                    else if (ram_access_cnt == ram_access_size - 1) begin
+                    if (ram_access_cnt == ram_access_size) begin
                         finish_rw_flag_to_ls_ex <= `TRUE;
                         ram_access_pc <= `ZERO_WORD;
                         ram_access_cnt <= 0;

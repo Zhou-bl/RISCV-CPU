@@ -1,4 +1,4 @@
-`include "/Users/zbl/Desktop/RISCV-CPU/riscv/src/constant.v"
+`include "/mnt/c/Users/zbl/Desktop/RISCV-CPU/riscv/src/constant.v"
 module data_forwarding(
     //Q:
     //data from rs:

@@ -1,6 +1,4 @@
-`include "/Users/zbl/Desktop/RISCV-CPU/riscv/src/constant.v"
-`include "/Users/zbl/Desktop/RISCV-CPU/riscv/src/Issue/decoder.v"
-`include "/Users/zbl/Desktop/RISCV-CPU/riscv/src/Issue/data_forwarding.v"
+`include "/mnt/c/Users/zbl/Desktop/RISCV-CPU/riscv/src/constant.v"
 //nmodule 作用：数据分发中心,接受各方数据并且在cdb总线上进行广播
 module dispatcher(
     //system clock:

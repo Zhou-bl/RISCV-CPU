@@ -1,4 +1,4 @@
-`include "/Users/zbl/Desktop/RISCV-CPU/riscv/src/constant.v"
+`include "/mnt/c/Users/zbl/Desktop/RISCV-CPU/riscv/src/constant.v"
 //返回给 IF 一个是否为跳转的 bool 类型和经符号位拓展的立即数
 module branch_predicter(
     input wire clk,
@@ -31,9 +31,11 @@ assign is_jump_flag = input_inst[`OPCODE_RANGE] == `OPCODE_JAL ? `TRUE :
 
 assign output_imm = input_inst[`OPCODE_RANGE] == `OPCODE_JAL ? J_type_imm : B_type_imm;
 
+integer i;
+
 always @(posedge clk) begin
     if(rst) begin
-      for(integer i = 0; i < BHT_SIZE - 1; ++i) begin
+      for(i = 0; i < BHT_SIZE - 1; i = i + 1) begin
         branch_history_table[i] = STRONG_NT;
       end
     end

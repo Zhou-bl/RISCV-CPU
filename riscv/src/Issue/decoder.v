@@ -1,4 +1,4 @@
-`include "/Users/zbl/Desktop/RISCV-CPU/riscv/src/constant.v"
+`include "/mnt/c/Users/zbl/Desktop/RISCV-CPU/riscv/src/constant.v"
 //此module的作用是从指令解析出指令的Type, rs1, rs2, rd, imm;
 module decoder(
     input wire [`INST_TYPE] input_inst,

@@ -1,4 +1,4 @@
-`include "/Users/zbl/Desktop/RISCV-CPU/riscv/src/constant.v"
+`include "/mnt/c/Users/zbl/Desktop/RISCV-CPU/riscv/src/constant.v"
 
 //为保证顺序执行，LSB需要实现为一个循环队列:
 module LS_buffer(
