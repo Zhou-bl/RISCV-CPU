@@ -11,10 +11,10 @@ module register_file(
     input wire [`REG_POS_TYPE] rs2_from_dispatcher,
     input wire [`REG_POS_TYPE] rd_from_dispatcher,
     input wire [`ROB_ID_TYPE] rob_id_for_rd_from_dispatcher,
-    output wire Q1_to_dispatcher,
-    output wire Q2_to_dispatcher,
-    output wire V1_to_dispatcher,
-    output wire V2_to_dispatcher,
+    output wire [`ROB_ID_TYPE] Q1_to_dispatcher,
+    output wire [`ROB_ID_TYPE] Q2_to_dispatcher,
+    output wire [`DATA_TYPE] V1_to_dispatcher,
+    output wire [`DATA_TYPE] V2_to_dispatcher,
 
     //port with ROB:
     input wire input_commit_flag,

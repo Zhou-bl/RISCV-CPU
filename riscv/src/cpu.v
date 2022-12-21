@@ -58,6 +58,8 @@ wire ok_signal_between_if_and_dispatcher;
 wire [`INST_TYPE] inst_between_if_and_dispatcher;
 wire [`ADDR_TYPE] pc_between_if_and_dispatcher;
 wire predicted_jump_flag_between_if_and_dispatcher;
+wire [`ADDR_TYPE] rollback_if_and_dispatcher;
+wire [`ADDR_TYPE] target_pc_from_ROB_to_if;
 fetcher CPU_fetcher(
   .clk(clk_in),
   .rst(rst_in),
@@ -82,7 +84,12 @@ fetcher CPU_fetcher(
   .ok_to_dsp_signal(ok_signal_between_if_and_dispatcher),
   .inst_to_dsp(inst_between_if_and_dispatcher),
   .pc_to_dsp(pc_between_if_and_dispatcher),
-  .predicted_jump_to_dsp(predicted_jump_flag_between_if_and_dispatcher)
+  .predicted_jump_to_dsp(predicted_jump_flag_between_if_and_dispatcher),
+  .roll_back_pc_to_dsp(rollback_if_and_dispatcher),
+
+  //port with ROB:
+  .misbranch_flag(misbranch_flag_cdb),
+  .target_pc_from_rob(target_pc_from_ROB_to_if)
 );
 
 wire is_update_flag_between_bp_and_ROB;
@@ -120,6 +127,7 @@ wire is_store_flag_between_dispatcher_and_ROB;
 wire predicted_jump_flag_between_dispatcher_and_ROB;
 wire [`ADDR_TYPE] pc_between_dispatcher_and_ROB;
 wire [`ROB_ID_TYPE] rob_id_between_dispatcher_and_ROB;
+wire [`ADDR_TYPE] rollback_pc_from_dispatcher_to_ROB;
 
 //for dispatcher port with register file:
 wire [`REG_POS_TYPE] rs1_between_dispatcher_and_REG;
@@ -163,6 +171,7 @@ dispatcher CPU_dispatcher(
   .inst_from_if(inst_between_if_and_dispatcher),
   .pc_from_if(pc_between_if_and_dispatcher),
   .predicted_jump_flag_from_if(predicted_jump_flag_between_if_and_dispatcher),
+  .rollback_pc_from_if(rollback_if_and_dispatcher),
 
   //port with rob:
   .Q1_to_rob(Q1_between_dispatcher_and_ROB),
@@ -178,6 +187,7 @@ dispatcher CPU_dispatcher(
   .predicted_jump_result_to_rob(predicted_jump_flag_between_dispatcher_and_ROB),
   .pc_to_rob(pc_between_dispatcher_and_ROB),
   .rob_id_from_rob(rob_id_between_dispatcher_and_ROB),
+  .rollback_pc_to_rob(rollback_pc_from_dispatcher_to_ROB),
 
   //port with register file:
   .rs1_to_reg(rs1_between_dispatcher_and_REG),
@@ -344,30 +354,154 @@ alu CPU_alu(
   .valid(Arith_unit_valid_signal)
 );
 
+//for lsu port with memctrl:
+wire finish_flag_from_memctrl_to_lsu;
+wire [`DATA_TYPE] data_from_memctrl_to_lsu;
+wire enable_signal_from_lsu_to_memctrl;
+wire read_or_write_flag_to_memctrl;
+wire [2:0] size_from_lsu_to_memctrl;
+wire [`ADDR_TYPE] address_from_lsu_to_memctrl;
+wire [`DATA_TYPE] data_from_lsu_to_memctrl;
+
 lsu CPU_lsu(
   .clk(clk_in),
   .rst(rst_in),
   .rdy(rdy_in),
 
   //port with LSB:
-  .enable_signal_from_LSB(),
-  .openum_from_LSB(),
-  .address_from_LSB(),
-  .data_from_LSB(),
-  .busy_signal_to_LSB(),
+  .enable_signal_from_LSB(enable_signal_between_LSB_and_lsu),
+  .openum_from_LSB(openum_between_LSB_and_lsu),
+  .address_from_LSB(mem_address_between_LSB_and_lsu),
+  .data_from_LSB(stored_data_between_LSB_and_lsu),
+  .busy_signal_to_LSB(busy_signal_between_LSB_and_lsu),
 
   //port with memctrl:
-  .finish_flag_from_memctrl(),
-  .data_from_memctrl(),
-  .enable_signal_to_memctrl(),
-  .read_or_write_flag_to_memctrl(),
-  .size_to_memctrl(),
-  .address_to_memctrl(),
-  .data_to_memctrl(),
+  .finish_flag_from_memctrl(finish_flag_from_memctrl_to_lsu),
+  .data_from_memctrl(data_from_memctrl_to_lsu),
+  .enable_signal_to_memctrl(enable_signal_from_lsu_to_memctrl),
+  .read_or_write_flag_to_memctrl(read_or_write_flag_to_memctrl),
+  .size_to_memctrl(size_from_lsu_to_memctrl),
+  .address_to_memctrl(address_from_lsu_to_memctrl),
+  .data_to_memctrl(data_from_lsu_to_memctrl),
   
   //port with LS_unit cdb:
-  .valid_signal_to_cdb(),
-  .result_to_cdb()
+  .valid_signal_to_cdb(LS_unit_valid_signal),
+  .result_to_cdb(LS_unit_result)
+);
+
+wire [`REG_POS_TYPE] rd_from_ROB_to_REG;
+wire [`ROB_ID_TYPE] Q_from_ROB_to_REG;
+wire [`DATA_TYPE] V_from_ROB_to_REG;
+
+reorder_buffer CPU_reorder_buffer(
+  .clk(clk_in),
+  .rst(rst_in),
+  .rdy(rdy_in),
+
+  //port with dispatcher:
+  .Q1_from_dispatcher(Q1_between_dispatcher_and_ROB),
+  .Q2_from_dispatcher(Q2_between_dispatcher_and_ROB),
+  .Q1_ready_signal_to_dispatcher(Q1_ready_signal_between_dispatcher_and_ROB),
+  .Q2_ready_signal_to_dispatcher(Q2_ready_signal_between_dispatcher_and_ROB),
+  .V1_to_dispatcher(V1_result_between_dispatcher_and_ROB),
+  .V2_to_dispatcher(V2_result_between_dispatcher_and_ROB),
+
+  .alloc_signal_from_dispatcher(enable_signal_between_dispatcher_and_ROB),
+  .is_jump_flag_from_dispatcher(is_jump_flag_between_dispatcher_and_ROB),
+  .is_store_flag_from_dispatcher(is_store_flag_between_dispatcher_and_ROB),
+  .rd_from_dispatcher(rd_between_dispatcher_and_ROB),
+  .predicted_jump_result_from_dispatcher(predicted_jump_flag_between_dispatcher_and_ROB),
+  .pc_from_dispatcher(pc_between_dispatcher_and_ROB),
+  .rollback_pc_from_dispatcher(rollback_pc_from_dispatcher_to_ROB),
+  .alloced_rob_id_to_dispatcher(rob_id_between_dispatcher_and_ROB),
+
+  //port with cdb:
+    //port with Arith_unit cdb:
+  .update_signal_from_alu(Arith_unit_valid_signal),
+  .rob_id_from_alu(Arith_unit_rob_id),
+  .result_from_alu(Arith_unit_result),
+  .target_pc_from_alu(Arith_unit_target_pc),
+  .precise_jump_result_from_alu(Arith_unit_precise_jump_flag),
+    //port with LS_unit cdb:
+  .update_signal_from_lsu(LS_unit_valid_signal),
+  .rob_id_from_lsu(LS_unit_rob_id),
+  .result_from_lsu(LS_unit_result),
+
+  //port with lsb(for IO):
+  .io_ins_rob_id_from_LSB(io_rob_id_from_LSB_to_ROB),
+
+  //port for commit:
+  .output_commit_flag(ROB_commit_signal_cdb),
+  .misbranch_flag(misbrach_flag_cdb),
+    //reg:
+  .rd_to_reg_file(rd_from_ROB_to_REG),
+  .Q_to_reg_file(Q_from_ROB_to_REG),
+  .V_to_reg_file(V_from_ROB_to_REG),
+    //if:
+  .target_pc_to_if(target_pc_from_ROB_to_if),
+    //lsb:
+  .rob_id_to_lsb(commit_rob_id_between_LSB_and_ROB),
+  .io_rob_id_to_lsb(io_rob_id_from_ROB_to_LSB),
+    //predictor:
+  .enable_signal_to_predictor(is_update_flag_between_bp_and_ROB),
+  .precise_branch_flag(precise_jump_flag_between_bp_and_ROB),
+  .pc_to_predictor(rob_pc_between_bp_and_ROB),
+
+  .full_signal(ROB_full_signal)    
+);
+
+wire misbranch_flag_cdb;
+
+register_file CPU_register_file(
+  .clk(clk_in),
+  .rst(rst_in),
+  .rdy(rdy_in),
+
+  //port with dispatcher:
+  .alloc_signal_from_dispatcher(enable_signal_between_dispatcher_and_REG),
+  .rs1_from_dispatcher(rs1_between_dispatcher_and_REG),
+  .rs2_from_dispatcher(rs2_between_dispatcher_and_REG),
+  .rd_from_dispatcher(rd_between_dispatcher_and_REG),
+  .rob_id_for_rd_from_dispatcher(Q_between_dispatcher_and_REG),
+  .Q1_to_dispatcher(Q1_between_dispatcher_and_REG),
+  .Q2_to_dispatcher(Q2_between_dispatcher_and_REG),
+  .V1_to_dispatcher(V1_between_dispatcher_and_REG),
+  .V2_to_dispatcher(V2_between_dispatcher_and_REG),
+
+  //port with ROB:
+  .input_commit_flag(ROB_commit_signal_cdb),
+  .rollback_flag(misbranch_flag_cdb),
+  .rd_from_ROB(rd_from_ROB_to_REG),
+  .Q_from_ROB(Q_from_ROB_to_REG),
+  .V_from_ROB(V_from_ROB_to_REG)
+);
+
+memory_controller CPU_memory_controller(
+  .clk(clk_in),
+  .rst(rst_in),
+  .rdy(rdy_in),
+
+  //port with RAM:
+  .io_buffer_full_signal(io_buffer_full),
+  .read_or_write_flag_to_ram(mem_wr),
+  .access_address_to_ram(mem_a),
+  .input_byte_from_ram(mem_din),
+  .output_byte_to_ram(mem_dout),
+
+  //port with if:
+  .start_query_signal(start_query_signal_between_if_and_memctrl),
+  .pc_from_if(query_pc_between_if_and_memctrl),
+  .finish_query_signal(finish_query_signal_between_if_and_memctrl),
+  .output_inst_to_if(queried_inst_between_if_and_memctrl),
+
+  //port with lsu:
+  .start_access_mem_signal(enable_signal_from_lsu_to_memctrl),
+  .read_or_write_flag_from_ls_ex(read_or_write_flag_to_memctrl),
+  .rw_length_from_ls_ex(size_from_lsu_to_memctrl),
+  .access_address_from_ls_ex(address_from_lsu_to_memctrl),
+  .write_data_from_ls_ex(data_from_lsu_to_memctrl),
+  .finish_rw_flag_to_ls_ex(finish_flag_from_memctrl_to_lsu),
+  .load_data_to_ls_ex(data_from_memctrl_to_lsu)
 );
 
 endmodule

@@ -13,6 +13,7 @@ module dispatcher(
     input wire [`INST_TYPE] inst_from_if,
     input wire [`ADDR_TYPE] pc_from_if,
     input wire predicted_jump_flag_from_if,
+    input wire [`ADDR_TYPE] rollback_pc_from_if,
 
     //port with rob
     output wire [`ROB_ID_TYPE] Q1_to_rob,
@@ -28,6 +29,7 @@ module dispatcher(
     output reg is_store_signal_to_rob,
     output reg predicted_jump_result_to_rob,
     output reg [`ADDR_TYPE] pc_to_rob,
+    output reg [`ADDR_TYPE] rollback_pc_to_rob,
     input wire [`ROB_ID_TYPE] rob_id_from_rob,
 
     //port with regfile:

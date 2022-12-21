@@ -40,12 +40,12 @@ module reorder_buffer (
 
     //port for commit:
     output reg output_commit_flag,
+    output reg misbranch_flag,
         //reg:
     output reg [`REG_POS_TYPE] rd_to_reg_file,
     output reg [`ROB_ID_TYPE] Q_to_reg_file,
     output reg [`DATA_TYPE] V_to_reg_file,
         //if:
-    output reg misbranch_flag,
     output reg [`ADDR_TYPE] target_pc_to_if,
         //lsb:
     output reg [`ROB_ID_TYPE] rob_id_to_lsb,

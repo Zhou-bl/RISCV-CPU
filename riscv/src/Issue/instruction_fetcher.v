@@ -23,7 +23,13 @@ module fetcher(
     output reg ok_to_dsp_signal,//一个脉冲信号
     output reg [`INST_TYPE] inst_to_dsp,
     output reg [`ADDR_TYPE] pc_to_dsp,
-    output reg predicted_jump_to_dsp
+    output reg predicted_jump_to_dsp,
+    output reg [`ADDR_TYPE] roll_back_pc_to_dsp,
+    
+    //port with ROB:
+    input wire misbranch_flag,
+    input wire [`ADDR_TYPE] target_pc_from_rob
+
 );
 
 localparam IDLE = 0, BUSY = 1; //busy : is querying inst from memCtrl
@@ -42,6 +48,8 @@ wire [`INST_TYPE] hitted_inst_in_cache = is_hit_in_cache ? cache_data[pc[`ICACHE
 assign inst_to_bp = hitted_inst_in_cache;
 assign pc_to_bp = pc;
 
+integer i;
+
 always @(posedge clk) begin
     if(rst) begin//initial:
         fetcher_status <= IDLE;
@@ -53,7 +61,7 @@ always @(posedge clk) begin
         query_pc <= `ZERO_ADDR;
         inst_to_dsp <= `ZERO_WORD;
         pc_to_dsp <= `ZERO_ADDR;
-        for (integer i = 0; i < `ICACHE_SIZE; i++) begin
+        for (i = 0; i < `ICACHE_SIZE; i = i + 1) begin
             cache_valid[i] <= `FALSE;
             cache_tag[i] <= `ZERO_WORD;
             cache_data[i] <= `ZERO_WORD;
@@ -68,6 +76,7 @@ always @(posedge clk) begin
         pc_to_dsp <= pc;
         predicted_jump_to_dsp <= predicted_jump_flag_from_bp;
         pc <= pc + (predicted_jump_flag_from_bp == `TRUE ? predicted_imm_from_bp : 4);
+        roll_back_pc_to_dsp <= pc + `NEXT_PC;
     end else begin//not hit or global_full
         if(is_hit_in_cache == `FALSE && fetcher_status == IDLE) begin//访问内存取指令
             fetcher_status <= BUSY;

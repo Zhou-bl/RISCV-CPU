@@ -5,7 +5,7 @@ module memory_controller(
     input wire rdy,
 
     //port with RAM:
-    input wire uart_full_signal,
+    input wire io_buffer_full_signal,
     output reg read_or_write_flag_to_ram,
     output reg [`ADDR_TYPE] access_address_to_ram,
     input wire [`MEMPORT_TYPE] input_byte_from_ram,
@@ -141,7 +141,7 @@ always @(posedge clk) begin
             end
         end
         else begin// busy
-            if (uart_full_signal == `FALSE) begin
+            if (io_buffer_full_signal == `FALSE) begin
                 if (status == STATUS_FETCH) begin
                     access_address_to_ram <= ram_access_pc;
                     read_or_write_flag_to_ram <= `READ_FLAG;
