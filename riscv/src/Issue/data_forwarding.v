@@ -27,9 +27,9 @@ module data_forwarding(
 );
 
 //计算运算数的Q,V:依次从alu\lsu\rob\reg中寻找
-assign Q1 = (valid_from_Arith_unit_cdb && Q1_from_reg == rob_id_from_Arith_unit_cdb) ? 
-`ZERO_ROB : ((valid_from_LS_unit_cdb && Q1_from_reg == rob_id_from_LS_unit_cdb) ? 
-`ZERO_ROB : (Q1_ready_from_rob ? 
+assign Q1 = (valid_from_Arith_unit_cdb == `TRUE && Q1_from_reg == rob_id_from_Arith_unit_cdb) ? 
+`ZERO_ROB : ((valid_from_LS_unit_cdb == `TRUE && Q1_from_reg == rob_id_from_LS_unit_cdb) ? 
+`ZERO_ROB : (Q1_ready_from_rob == `TRUE ? 
 `ZERO_ROB : (Q1_from_reg)));
 
 assign Q2 = (valid_from_Arith_unit_cdb && Q2_from_reg == rob_id_from_Arith_unit_cdb) ?

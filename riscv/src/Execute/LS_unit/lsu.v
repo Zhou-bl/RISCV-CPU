@@ -123,6 +123,9 @@ always @(posedge clk) begin
         end
         else begin
             enable_signal_to_memctrl <= `FALSE;
+            if(misbranch_flag && status != STATUS_STORE) begin
+                status <= STATUS_IDLE;//普通的load操作可以被中止
+            end
             if(finish_flag_from_memctrl) begin
                 status <= STATUS_IDLE;
                 if(status != STATUS_STORE) begin

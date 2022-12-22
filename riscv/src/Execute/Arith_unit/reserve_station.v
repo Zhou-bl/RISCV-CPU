@@ -55,6 +55,8 @@ assign full_signal = full;
 wire [`ROB_ID_TYPE] updated_Q1, updated_Q2;
 wire [`DATA_TYPE] updated_V1, updated_V2;
 
+integer debug_cnt = 0;
+
 //更新最新的Q1,Q2,V1,V2:
 //因为某条指令j在dispatch中时，它的上一条指令i在RS中，当j在RS中时，i在ALU中计算出来了结果，需要对其更新
 assign updated_Q1 = (valid_signal_from_Arith_unit_cdb && Q1_from_dispatcher == rob_id_from_Arith_unit_cdb) ? 
@@ -114,23 +116,39 @@ assign next_to_alu_index =
 (`INVALID_RS)))))))))))))))));
 
 always @(posedge clk) begin
-    if(rst) begin//clear RS station
+    if(rst || misbranch_flag == `TRUE) begin//clear RS station
         for(i = 0; i <= 15; i = i + 1) begin
             RS_busy <= `FALSE;
-            RS_imm[i] <= `FALSE;
-            RS_openum[i] <= `FALSE;
-            RS_pc[i] <= `FALSE;
-            RS_Q1[i] <= `FALSE;
-            RS_Q2[i] <= `FALSE;
-            RS_rob_id[i] <= `FALSE;
-            RS_V1[i] <= `FALSE;
-            RS_V2[i] <= `FALSE;
+            RS_imm[i] <= `ZERO_WORD;
+            RS_openum[i] <= `OPENUM_NOP;
+            RS_pc[i] <= `ZERO_ADDR;
+            RS_Q1[i] <= `ZERO_ROB;
+            RS_Q2[i] <= `ZERO_ROB;
+            RS_rob_id[i] <= `ZERO_ROB;
+            RS_V1[i] <= `ZERO_WORD;
+            RS_V2[i] <= `ZERO_WORD;
         end
+        //$display("RS_Q1: ", RS_Q1[0]);
     end else if(~rdy) begin 
     end else begin
         //1.监听cdb总线更新RS中的数据
         //2.将从dispatcher传入的指令放入RS中
         //3.将next_to_alu_index所在的指令传到alu中
+
+        if(next_to_alu_index == `INVALID_RS) begin
+            openum_to_alu <= `OPENUM_NOP;
+        end else begin
+            //$display("next_to_alu_index: ", next_to_alu_index);
+            //$display("RS_busy: ", RS_busy[0]);
+            //$display("RS_Q1: ", RS_Q1[0]);
+            openum_to_alu <= openum_from_dispatcher;
+            rob_id_to_Arith_unit_cdb <= RS_rob_id[next_to_alu_index];
+            RS_busy[next_to_alu_index] <= `FALSE;
+            V1_to_alu <= RS_V1[next_to_alu_index];
+            V2_to_alu <= RS_V2[next_to_alu_index];
+            pc_to_alu <= RS_pc[next_to_alu_index];
+            imm_to_alu <= RS_imm[next_to_alu_index];
+        end
 
         if(valid_signal_from_Arith_unit_cdb == `TRUE) begin
             for(i = 0; i <= 15; i = i + 1) begin
@@ -158,6 +176,18 @@ always @(posedge clk) begin
         end
 
         if(enable_signal_from_dispatcher == `TRUE && free_index != `INVALID_RS) begin
+            
+            /*
+            debug_cnt++;
+            $display("cnt : ", debug_cnt);
+            $display("valid_signal_from_Arith: ", valid_signal_from_Arith_unit_cdb);
+            $display("Q1_from_dispatcher: ", Q1_from_dispatcher);
+            $display("rob_id_from_Arith, ", rob_id_from_Arith_unit_cdb);
+            $display("valid_signal_from_LS: ", valid_signal_from_LS_unit_cdb);
+            $display("Q1_from_LS: ", rob_id_from_LS_unit_cdb);
+            $display("");
+            */
+
             RS_busy[free_index] <= `TRUE;
             RS_imm[free_index] <= imm_from_dispatcher;
             RS_openum[free_index] <= openum_from_dispatcher;
@@ -167,18 +197,6 @@ always @(posedge clk) begin
             RS_V1[free_index] <= updated_V1;
             RS_V2[free_index] <= updated_V2;
             RS_rob_id[free_index] <= rob_id_from_dispatcher;
-        end
-
-        if(next_to_alu_index == `INVALID_RS) begin
-            openum_to_alu <= `OPENUM_NOP;
-        end else begin
-            openum_to_alu <= openum_from_dispatcher;
-            rob_id_to_Arith_unit_cdb <= RS_rob_id[next_to_alu_index];
-            RS_busy[next_to_alu_index] <= `FALSE;
-            V1_to_alu <= RS_V1[next_to_alu_index];
-            V2_to_alu <= RS_V2[next_to_alu_index];
-            pc_to_alu <= RS_pc[next_to_alu_index];
-            imm_to_alu <= RS_imm[next_to_alu_index];
         end
     end
 end

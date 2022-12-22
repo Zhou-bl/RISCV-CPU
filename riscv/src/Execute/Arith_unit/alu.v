@@ -13,6 +13,8 @@ module alu(
 );
 
 always @(*) begin
+    //valid = (input_openum != `OPENUM_NOP);
+    
     case (input_openum)
         `OPENUM_LUI:begin
             output_result = imm;
@@ -195,6 +197,7 @@ always @(*) begin
             valid = `FALSE;
         end
     endcase
+    $display("valid: ", valid);
 end
 
 endmodule

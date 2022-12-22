@@ -99,6 +99,7 @@ decoder internal_decoder(
     .imm(imm_from_decoder)
 );
 
+/*
 data_forwarding internal_data_forwarding(
     .valid_from_Arith_unit_cdb(valid_from_Arith_unit_cdb),
     .rob_id_from_Arith_unit_cdb(rob_id_from_Arith_unit_cdb),
@@ -123,6 +124,27 @@ data_forwarding internal_data_forwarding(
     .V1_to_dispatch(V1),
     .V2_to_dispatch(V2)
 );
+*/
+
+assign Q1 = (valid_from_Arith_unit_cdb == `TRUE && Q1_from_reg == rob_id_from_Arith_unit_cdb) ? 
+`ZERO_ROB : ((valid_from_LS_unit_cdb == `TRUE && Q1_from_reg == rob_id_from_LS_unit_cdb) ? 
+`ZERO_ROB : (Q1_ready_from_rob == `TRUE ? 
+`ZERO_ROB : (Q1_from_reg)));
+
+assign Q2 = (valid_from_Arith_unit_cdb && Q2_from_reg == rob_id_from_Arith_unit_cdb) ?
+`ZERO_ROB : ((valid_from_LS_unit_cdb && Q2_from_reg == rob_id_from_LS_unit_cdb) ? 
+`ZERO_ROB : (Q2_ready_from_rob ? 
+`ZERO_ROB : (Q2_from_reg)));
+
+assign V1 = (valid_from_Arith_unit_cdb && Q1_from_reg == rob_id_from_Arith_unit_cdb) ?
+result_from_Arith_unit_cdb : ((valid_from_LS_unit_cdb && Q1_from_reg == rob_id_from_LS_unit_cdb) ? 
+result_from_LS_unit_cdb : ((Q1_ready_from_rob ? 
+V1_result_from_rob : V1_from_reg)));
+
+assign V2 = (valid_from_LS_unit_cdb && Q2_from_reg == rob_id_from_Arith_unit_cdb) ?
+result_from_Arith_unit_cdb : ((valid_from_LS_unit_cdb && Q2_from_reg == rob_id_from_LS_unit_cdb) ?
+result_from_LS_unit_cdb : ((Q2_ready_from_rob ?
+V2_result_from_rob : V2_from_reg)));
 
 assign Q1_to_rob = Q1_from_reg;
 assign Q2_to_rob = Q2_from_reg;
@@ -134,6 +156,8 @@ assign Q_to_reg = rob_id_from_rob;
 assign rob_id_to_rs = rob_id_from_rob;
 assign rob_id_to_lsb = rob_id_from_rob;
 
+integer debug_cnt = 0;
+
 always @(posedge clk) begin
     if(rst) begin
         ena_to_lsb <= `FALSE;
@@ -143,7 +167,7 @@ always @(posedge clk) begin
     end
     else if(~rdy) begin
     end
-    else if(openum_from_decoder == `OPENUM_NOP || !rdy_flag_from_if) begin
+    else if(openum_from_decoder == `OPENUM_NOP || !rdy_flag_from_if || misbranch_flag) begin
         ena_to_lsb <= `FALSE;
         ena_to_reg <= `FALSE;
         ena_to_rob <= `FALSE;
@@ -158,10 +182,13 @@ always @(posedge clk) begin
         is_jump_signal_to_rob <= is_jump_from_decoder;
         is_store_signal_to_rob <= is_store_from_decoder;
         predicted_jump_result_to_rob <= predicted_jump_flag_from_if;
+        
         if(openum_from_decoder >= `OPENUM_LB && openum_from_decoder <= `OPENUM_SW) begin
+            
+        
+
             ena_to_lsb <= `TRUE;
             ena_to_rs <= `FALSE;
-
             openum_to_lsb <= openum_from_decoder;
             Q1_to_lsb <= Q1;
             Q2_to_lsb <= Q2;
@@ -177,8 +204,20 @@ always @(posedge clk) begin
             V2_to_rs <= `ZERO_WORD;
             pc_to_rs <= `ZERO_ADDR;
             imm_to_rs <= `ZERO_WORD;
+            debug_cnt++;
+            $display("[debug] dsp cnt: ", debug_cnt);
+            $display("[debug] dsp valid_from_Arith: ", valid_from_Arith_unit_cdb);
+            $display("[debug] dsp rob id from Arith: ", rob_id_from_Arith_unit_cdb);
+            $display("[debug] dsp result from Arith: ", result_from_Arith_unit_cdb);
+            $display("[debug] dsp valid_from_LS: ", valid_from_LS_unit_cdb);
+            $display("[debug] dsp rob id from LS: ", rob_id_from_LS_unit_cdb);
+            $display("[debug] dsp result from LS: ", result_from_LS_unit_cdb);
+            $display("[debug] dsp Q1_ready_from_rob: ", Q1_ready_from_rob);
+            $display("[debug] dsp reg: ", Q1_from_reg);
+            $display("[debug] Q1: ", Q1);
         end
         else begin
+            
             ena_to_rs <= `TRUE;
             ena_to_lsb <= `FALSE;
 
@@ -197,6 +236,17 @@ always @(posedge clk) begin
             V1_to_lsb <= `ZERO_WORD;
             V2_to_lsb <= `ZERO_WORD;
             imm_to_lsb <= `ZERO_WORD;
+            debug_cnt++;
+            $display("[debug] dsp cnt: ", debug_cnt);
+            $display("[debug] dsp valid_from_Arith: ", valid_from_Arith_unit_cdb);
+            $display("[debug] dsp rob id from Arith: ", rob_id_from_Arith_unit_cdb);
+            $display("[debug] dsp result from Arith: ", result_from_Arith_unit_cdb);
+            $display("[debug] dsp valid_from_LS: ", valid_from_LS_unit_cdb);
+            $display("[debug] dsp rob id from LS: ", rob_id_from_LS_unit_cdb);
+            $display("[debug] dsp result from LS: ", result_from_LS_unit_cdb);
+            $display("[debug] dsp Q1_ready_from_rob: ", Q1_ready_from_rob);
+            $display("[debug] dsp reg: ", Q1_from_reg);
+            $display("[debug] Q1: ", Q1);
         end
     end else begin
         //消除latch:

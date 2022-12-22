@@ -36,7 +36,7 @@
 `define INVALID_RS 5'h10
 `define ZERO_LSB 5'h0
 `define INVALID_LSB 5'h10
-`define ZERO_ROB 4'h0
+`define ZERO_ROB 5'h0
 
 //cache:
 //because pc is 4 times, so the lowest bits are useless.
