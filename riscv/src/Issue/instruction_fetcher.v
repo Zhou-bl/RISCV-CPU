@@ -41,6 +41,7 @@ reg [`INST_TYPE] cache_data [`ICACHE_SIZE - 1 : 0];//store data in cache
 
 reg [`STATUS_TYPE] fetcher_status;//一个持续的状态
 reg [`ADDR_TYPE] pc;
+reg [`ADDR_TYPE] pc_for_memctrl;
 
 wire is_hit_in_cache = cache_valid[pc[`ICACHE_INDEX_RANGE]] && cache_tag[pc[`ICACHE_INDEX_RANGE]] == pc[`ICACHE_TAG_RANGE];
 wire [`INST_TYPE] hitted_inst_in_cache = is_hit_in_cache ? cache_data[pc[`ICACHE_INDEX_RANGE]] : `ZERO_WORD;
@@ -58,6 +59,7 @@ always @(posedge clk) begin
         ok_to_dsp_signal <= `FALSE;
         //output data:
         pc <= `ZERO_ADDR;
+        pc_for_memctrl <= `ZERO_ADDR;
         query_pc <= `ZERO_ADDR;
         inst_to_dsp <= `ZERO_WORD;
         pc_to_dsp <= `ZERO_ADDR;
@@ -68,33 +70,40 @@ always @(posedge clk) begin
         end
     end else if (~rdy)begin
     end
-    start_query_signal <= `FALSE;
-    ok_to_dsp_signal <= `FALSE;
-    if(misbranch_flag == `TRUE) begin
+    else if(misbranch_flag == `TRUE) begin
         ok_to_dsp_signal <= `FALSE;
         pc <= target_pc_from_rob;
+        pc_for_memctrl <= target_pc_from_rob;
         fetcher_status <= IDLE;
         start_query_signal <= `FALSE;
-    end    
-    else if (is_hit_in_cache == `TRUE && global_full_signal == `FALSE) begin//往下传指令
-        ok_to_dsp_signal <= `TRUE;
-        inst_to_dsp <= hitted_inst_in_cache;
-        pc_to_dsp <= pc;
-        predicted_jump_to_dsp <= predicted_jump_flag_from_bp;
-        pc <= pc + (predicted_jump_flag_from_bp == `TRUE ? predicted_imm_from_bp : 4);
-        roll_back_pc_to_dsp <= pc + `NEXT_PC;
-    end 
-    else begin//not hit or global_full
-        if(is_hit_in_cache == `FALSE && fetcher_status == IDLE) begin//访问内存取指令
+    end
+    else begin
+        start_query_signal <= `FALSE;
+        if (is_hit_in_cache == `TRUE && global_full_signal == `FALSE) begin//往下传指令
+            ok_to_dsp_signal <= `TRUE;
+            inst_to_dsp <= hitted_inst_in_cache;
+            pc_to_dsp <= pc;
+            predicted_jump_to_dsp <= predicted_jump_flag_from_bp;
+            pc <= pc + (predicted_jump_flag_from_bp == `TRUE ? predicted_imm_from_bp : 4);
+            roll_back_pc_to_dsp <= pc + `NEXT_PC;
+        end
+        else begin
+            ok_to_dsp_signal <= `FALSE;
+        end
+        //not hit or global_full
+        if(fetcher_status == IDLE) begin
+            //访问内存取指令
+            //[BUG!!!] 同时IDLE和往dispatcher传指令时,要记录一个更早的pc
             fetcher_status <= BUSY;
             start_query_signal <= `TRUE;
-            query_pc <= pc;
+            query_pc <= pc_for_memctrl;
         end
         else if (finish_query_signal) begin
             fetcher_status <= IDLE;
-            cache_data[pc[`ICACHE_INDEX_RANGE]] <= queried_inst;
-            cache_valid[pc[`ICACHE_INDEX_RANGE]] <= `TRUE;
-            cache_tag[pc[`ICACHE_INDEX_RANGE]] <= pc[`ICACHE_TAG_RANGE];
+            pc_for_memctrl <= pc_for_memctrl == pc ? pc_for_memctrl + `NEXT_PC : pc;
+            cache_data[pc_for_memctrl[`ICACHE_INDEX_RANGE]] <= queried_inst;
+            cache_valid[pc_for_memctrl[`ICACHE_INDEX_RANGE]] <= `TRUE;
+            cache_tag[pc_for_memctrl[`ICACHE_INDEX_RANGE]] <= pc_for_memctrl[`ICACHE_TAG_RANGE];
         end
     end
 end

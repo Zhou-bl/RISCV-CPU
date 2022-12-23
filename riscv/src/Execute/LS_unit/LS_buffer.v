@@ -127,44 +127,61 @@ always @(posedge clk) begin
             tail <= next_tail;
         end
 
-        if(send_to_lsu_signal) begin
+        //rob commit:
+        if(commit_signal == `TRUE) begin
+            //更改ROB的commit tag:
+            for(i = 0; i < `ROB_SIZE; i = i + 1) begin
+                if(LSB_busy[i] && LSB_rob_id[i] == commit_rob_id_from_rob && !LSB_is_committed[i]) begin
+                    LSB_is_committed[i] <= `TRUE;
+                end
+            end
+        end
+
+        if(LSB_busy[head] && busy_signal_from_lsu == `FALSE && LSB_Q1[head] == `ZERO_ROB && LSB_Q2[head] == `ZERO_ROB) begin
+            $display("hello!!!!!!");
             if (openum_from_dispatcher <= `OPENUM_LHU) begin
                 //load:
                 //clear LSB[head]:
-                LSB_busy[head] <= `FALSE;
-                LSB_rob_id[head] <= `ZERO_ROB;
-                LSB_is_committed[head] <= `FALSE;
-                LSB_imm[head] <= `ZERO_WORD;
-                LSB_openum[head] <= `OPENUM_NOP;
-                LSB_Q1[head] <= `ZERO_ROB;
-                LSB_Q2[head] <= `ZERO_ROB;
-                LSB_V1[head] <= `ZERO_WORD;
-                LSB_V2[head] <= `ZERO_WORD;
-                //send information to lsu:
-                enable_signal_to_lsu <= `TRUE;
-                openum_to_lsu <= LSB_openum[head];
-                mem_address_to_lsu <= LSB_imm[head] + LSB_V1[head];
-                stored_data <= `ZERO_WORD;
-                head <= next_head;
+                $display("hello_11111111111111");
+                if(address != `RAM_IO_ADDRESS || LSB_rob_id[head] == io_rob_id_from_rob) begin
+                    LSB_busy[head] <= `FALSE;
+                    LSB_rob_id[head] <= `ZERO_ROB;
+                    LSB_is_committed[head] <= `FALSE;
+                    LSB_imm[head] <= `ZERO_WORD;
+                    LSB_openum[head] <= `OPENUM_NOP;
+                    LSB_Q1[head] <= `ZERO_ROB;
+                    LSB_Q2[head] <= `ZERO_ROB;
+                    LSB_V1[head] <= `ZERO_WORD;
+                    LSB_V2[head] <= `ZERO_WORD;
+                    //send information to lsu:
+                    enable_signal_to_lsu <= `TRUE;
+                    openum_to_lsu <= LSB_openum[head];
+                    mem_address_to_lsu <= LSB_imm[head] + LSB_V1[head];
+                    stored_data <= `ZERO_WORD;
+                    head <= next_head;
+                end
             end
             else begin
                 //store:
                 //clear LSB[head]:
-                LSB_busy[head] <= `FALSE;
-                LSB_rob_id[head] <= `ZERO_ROB;
-                LSB_is_committed[head] <= `FALSE;
-                LSB_imm[head] <= `ZERO_WORD;
-                LSB_openum[head] <= `OPENUM_NOP;
-                LSB_Q1[head] <= `ZERO_ROB;
-                LSB_Q2[head] <= `ZERO_ROB;
-                LSB_V1[head] <= `ZERO_WORD;
-                LSB_V2[head] <= `ZERO_WORD;
-                //send information to lsu:
-                enable_signal_to_lsu <= `TRUE;
-                openum_to_lsu <= LSB_openum[head];
-                mem_address_to_lsu <= LSB_imm[head] + LSB_V1[head];
-                stored_data <= LSB_V2[head];
-                head <= next_head;
+                $display("hello_22222222222");
+                if(LSB_is_committed[head]) begin
+                    LSB_busy[head] <= `FALSE;
+                    LSB_rob_id[head] <= `ZERO_ROB;
+                    LSB_is_committed[head] <= `FALSE;
+                    LSB_imm[head] <= `ZERO_WORD;
+                    LSB_openum[head] <= `OPENUM_NOP;
+                    LSB_Q1[head] <= `ZERO_ROB;
+                    LSB_Q2[head] <= `ZERO_ROB;
+                    LSB_V1[head] <= `ZERO_WORD;
+                    LSB_V2[head] <= `ZERO_WORD;
+                    //send information to lsu:
+                    enable_signal_to_lsu <= `TRUE;
+                    openum_to_lsu <= LSB_openum[head];
+                    mem_address_to_lsu <= LSB_imm[head] + LSB_V1[head];
+                    stored_data <= LSB_V2[head];
+                    head <= next_head;
+                end
             end
         end
 

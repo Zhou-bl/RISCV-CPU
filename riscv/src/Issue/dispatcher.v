@@ -204,6 +204,7 @@ always @(posedge clk) begin
             V2_to_rs <= `ZERO_WORD;
             pc_to_rs <= `ZERO_ADDR;
             imm_to_rs <= `ZERO_WORD;
+            /*
             debug_cnt++;
             $display("[debug] dsp cnt: ", debug_cnt);
             $display("[debug] dsp valid_from_Arith: ", valid_from_Arith_unit_cdb);
@@ -215,6 +216,7 @@ always @(posedge clk) begin
             $display("[debug] dsp Q1_ready_from_rob: ", Q1_ready_from_rob);
             $display("[debug] dsp reg: ", Q1_from_reg);
             $display("[debug] Q1: ", Q1);
+            */
         end
         else begin
             
@@ -236,6 +238,7 @@ always @(posedge clk) begin
             V1_to_lsb <= `ZERO_WORD;
             V2_to_lsb <= `ZERO_WORD;
             imm_to_lsb <= `ZERO_WORD;
+            /*
             debug_cnt++;
             $display("[debug] dsp cnt: ", debug_cnt);
             $display("[debug] dsp valid_from_Arith: ", valid_from_Arith_unit_cdb);
@@ -247,8 +250,10 @@ always @(posedge clk) begin
             $display("[debug] dsp Q1_ready_from_rob: ", Q1_ready_from_rob);
             $display("[debug] dsp reg: ", Q1_from_reg);
             $display("[debug] Q1: ", Q1);
+            */
         end
-    end else begin
+    end 
+    else begin
         //消除latch:
         ena_to_lsb <= `FALSE;
         ena_to_reg <= `FALSE;

@@ -425,7 +425,7 @@ reorder_buffer CPU_reorder_buffer(
 
   //port for commit:
   .output_commit_flag(ROB_commit_signal_cdb),
-  .misbranch_flag(misbrach_flag_cdb),
+  .misbranch_flag(misbranch_flag_cdb),
     //reg:
   .rd_to_reg_file(rd_from_ROB_to_REG),
   .Q_to_reg_file(Q_from_ROB_to_REG),

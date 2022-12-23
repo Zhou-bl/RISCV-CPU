@@ -71,7 +71,7 @@ reg [`REG_POS_TYPE] ROB_rd [`ROB_SIZE - 1 : 0];
 reg [`DATA_TYPE] ROB_value [`ROB_SIZE - 1 : 0];
  
 reg[`ROB_POS_TYPE] head, tail;
-wire [`ROB_ID_TYPE]next_head, next_tail;
+wire [`ROB_POS_TYPE]next_head, next_tail;
 reg [`ROB_POS_TYPE] cur_ROB_size;
 wire commit_signal;
 
@@ -83,16 +83,19 @@ assign Q1_ready_signal_to_dispatcher = Q1_from_dispatcher == `ZERO_ROB ? `FALSE 
 assign Q2_ready_signal_to_dispatcher = Q2_from_dispatcher == `ZERO_ROB ? `FALSE : ROB_is_ready[Q2_from_dispatcher - 1];
 assign V1_to_dispatcher = Q1_from_dispatcher == `ZERO_ROB ? `ZERO_WORD : ROB_value[Q1_from_dispatcher - 1];
 assign V2_to_dispatcher = Q2_from_dispatcher == `ZERO_ROB ? `ZERO_WORD : ROB_value[Q2_from_dispatcher - 1];
+assign next_head = head == `ROB_SIZE - 1 ? 0 : head + 1;
+assign next_tail = tail == `ROB_SIZE - 1 ? 0 : tail + 1;
 
 integer i;
 
 always @(posedge clk) begin
-    if(rst) begin
+    if(rst || misbranch_flag) begin
         cur_ROB_size <= 0;
         head <= 0;
         tail <= 0;
         output_commit_flag <= `FALSE;
         enable_signal_to_predictor <= `FALSE;
+        misbranch_flag <= `FALSE;
         for(i = 0; i <= 15; i = i + 1) begin
             ROB_busy[i] <= `FALSE;
             ROB_is_IO[i] <= `FALSE;
@@ -119,7 +122,7 @@ always @(posedge clk) begin
         enable_signal_to_predictor <= `FALSE;
         cur_ROB_size <= cur_ROB_size - commit_signal + alloc_signal_from_dispatcher;
         //commit:
-        if(commit_signal) begin
+        if(ROB_busy[head] && (ROB_is_ready[head] || ROB_is_store[head])) begin
             //to reg file and LSB:
             if(ROB_is_jump[head]) begin
                 enable_signal_to_predictor <= `TRUE;
