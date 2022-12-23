@@ -162,13 +162,19 @@ always @(posedge clk) begin
                     if (ram_access_cnt < ram_access_size - 1) begin
                         ram_access_pc <= ram_access_pc + 1;
                     end
+                    else begin
+                        ram_access_pc <= `ZERO_ADDR;
+                    end
                     //ram_access_pc <= (ram_access_cnt >= ram_access_size - 1) ? `ZERO_ADDR : ram_access_pc + 1;
                     if (ram_access_cnt == ram_access_size) begin
                         finish_query_signal <= `TRUE;
                         ram_access_pc <= `ZERO_ADDR;
                         ram_access_cnt <= 0;
                         status <= STATUS_IDLE;
-                    end else begin ram_access_cnt <= ram_access_cnt + 1; end
+                    end 
+                    else begin 
+                        ram_access_cnt <= ram_access_cnt + 1; 
+                    end
                 end
                 if (status == STATUS_LOAD) begin
                     access_address_to_ram <= ram_access_pc;
@@ -182,13 +188,19 @@ always @(posedge clk) begin
                     if (ram_access_cnt < ram_access_size - 1) begin
                         ram_access_pc <= ram_access_pc + 1;
                     end
+                    else begin
+                        ram_access_pc <= `ZERO_ADDR;
+                    end
                     //ram_access_pc <= (ram_access_cnt >= ram_access_size - 1) ? `ZERO_WORD : ram_access_pc + 1;
                     if (ram_access_cnt == ram_access_size) begin
                         finish_rw_flag_to_ls_ex <= `TRUE;
                         ram_access_pc <= `ZERO_WORD;
                         ram_access_cnt <= 0;
                         status <= STATUS_IDLE;
-                    end else begin ram_access_cnt <= ram_access_cnt + 1; end
+                    end 
+                    else begin 
+                        ram_access_cnt <= ram_access_cnt + 1; 
+                    end
                 end
                 if (status == STATUS_STORE) begin
                     access_address_to_ram <= ram_access_pc;
