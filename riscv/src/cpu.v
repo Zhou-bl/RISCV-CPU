@@ -49,6 +49,7 @@ wire predicted_jump_flag_between_if_and_dispatcher;
 wire [`ADDR_TYPE] rollback_if_and_dispatcher;
 wire [`ADDR_TYPE] target_pc_from_ROB_to_if;
 wire misbranch_flag_cdb;
+wire stop_signal_from_if_to_memctlr;
 fetcher CPU_fetcher(
   .clk(clk_in),
   .rst(rst_in),
@@ -62,6 +63,7 @@ fetcher CPU_fetcher(
   .queried_inst(queried_inst_between_if_and_memctrl),
   .start_query_signal(start_query_signal_between_if_and_memctrl),
   .query_pc(query_pc_between_if_and_memctrl),
+  .stop_signal(stop_signal_from_if_to_memctlr),
 
   //port with branch_predicter:
   .predicted_jump_flag_from_bp(is_jump_flag_between_if_and_bp),
@@ -483,6 +485,7 @@ memory_controller CPU_memory_controller(
   //port with if:
   .start_query_signal(start_query_signal_between_if_and_memctrl),
   .pc_from_if(query_pc_between_if_and_memctrl),
+  .stop_signal(stop_signal_from_if_to_memctlr),
   .finish_query_signal(finish_query_signal_between_if_and_memctrl),
   .output_inst_to_if(queried_inst_between_if_and_memctrl),
 

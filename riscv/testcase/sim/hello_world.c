@@ -1,7 +1,7 @@
 #include "io.h"
 //int x = 100;
 int main(){
-    //println(100);
+    println("hello");
     //int x = 100;
-    //outl(x);
+    //outlln(x);
 }

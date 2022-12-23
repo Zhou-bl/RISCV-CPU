@@ -14,6 +14,7 @@ module memory_controller(
     //port with IF:
     input wire start_query_signal,//脉冲
     input wire [`ADDR_TYPE] pc_from_if,
+    input wire stop_signal,
     output reg finish_query_signal,//脉冲
     output reg [`INST_TYPE] output_inst_to_if,
 
@@ -68,6 +69,15 @@ always @(posedge clk) begin
         finish_rw_flag_to_ls_ex <= `FALSE;
     end
     else begin
+        if(stop_signal == `TRUE) begin
+            if(status == STATUS_FETCH || status == STATUS_LOAD) begin
+                status <= STATUS_IDLE;
+            end
+            buffered_start_query_signal <= `FALSE;
+            if(buffered_start_access_mem_signal == `TRUE && buffered_read_or_write_flag_from_ls_ex == `READ_FLAG) begin
+                buffered_start_access_mem_signal <= `FALSE;
+            end
+        end
         if (status != STATUS_IDLE  || (start_query_signal && start_access_mem_signal)) begin
             //同时来两个信号或者memctrl处于忙碌状态时:
             //buffer the message:
@@ -167,7 +177,8 @@ always @(posedge clk) begin
                     end
                     //ram_access_pc <= (ram_access_cnt >= ram_access_size - 1) ? `ZERO_ADDR : ram_access_pc + 1;
                     if (ram_access_cnt == ram_access_size) begin
-                        finish_query_signal <= `TRUE;
+                        //finish_query_signal <= `TRUE;
+                        finish_query_signal <= ~stop_signal;
                         ram_access_pc <= `ZERO_ADDR;
                         ram_access_cnt <= 0;
                         status <= STATUS_IDLE;
@@ -193,7 +204,8 @@ always @(posedge clk) begin
                     end
                     //ram_access_pc <= (ram_access_cnt >= ram_access_size - 1) ? `ZERO_WORD : ram_access_pc + 1;
                     if (ram_access_cnt == ram_access_size) begin
-                        finish_rw_flag_to_ls_ex <= `TRUE;
+                        //finish_rw_flag_to_ls_ex <= `TRUE;
+                        finish_rw_flag_to_ls_ex <= ~stop_signal;
                         ram_access_pc <= `ZERO_WORD;
                         ram_access_cnt <= 0;
                         status <= STATUS_IDLE;

@@ -12,6 +12,7 @@ module fetcher(
     input wire [`INST_TYPE] queried_inst,
     output reg start_query_signal,//一个脉冲信号
     output reg[`ADDR_TYPE] query_pc,
+    output reg stop_signal, //stop querying the instruction when disbranch signal go into the fetcher.
 
     //port with branch_predicter:
     input wire predicted_jump_flag_from_bp,
@@ -56,6 +57,7 @@ always @(posedge clk) begin
         fetcher_status <= IDLE;
         //output signal:
         start_query_signal <= `FALSE;
+        stop_signal <= `FALSE;
         ok_to_dsp_signal <= `FALSE;
         //output data:
         pc <= `ZERO_ADDR;
@@ -77,9 +79,11 @@ always @(posedge clk) begin
         pc_for_memctrl <= target_pc_from_rob;
         fetcher_status <= IDLE;
         start_query_signal <= `FALSE;
+        stop_signal <= `TRUE;
     end
     else begin
         //$display("IF---> non_misbranch: ", pc);
+        stop_signal <= `FALSE;
         start_query_signal <= `FALSE;
         if (is_hit_in_cache == `TRUE && global_full_signal == `FALSE) begin//往下传指令
             ok_to_dsp_signal <= `TRUE;
