@@ -25,6 +25,7 @@ module LS_buffer(
     input wire valid_signal_from_LS_unit_cdb,
     input wire [`ROB_ID_TYPE] rob_id_from_LS_unit_cdb,
     input wire [`DATA_TYPE] result_from_LS_unit_cdb,
+    output reg [`ROB_ID_TYPE] rob_id_to_LS_unit_cdb,
     
     //port with lsu:
     input wire busy_signal_from_lsu,
@@ -91,6 +92,7 @@ integer i;
 
 always @(posedge clk) begin
     if(rst || misbranch_flag == `TRUE) begin
+        rob_id_to_LS_unit_cdb <= `ZERO_ROB;
         for(i = 0; i <= 15; i = i + 1) begin
             LSB_busy[i] <= `FALSE;
             LSB_imm[i] <= `ZERO_WORD;
@@ -138,11 +140,11 @@ always @(posedge clk) begin
         end
 
         if(LSB_busy[head] && busy_signal_from_lsu == `FALSE && LSB_Q1[head] == `ZERO_ROB && LSB_Q2[head] == `ZERO_ROB) begin
-            $display("hello!!!!!!");
+            //$display("hello!!!!!!");
             if (openum_from_dispatcher <= `OPENUM_LHU) begin
                 //load:
                 //clear LSB[head]:
-                $display("hello_11111111111111");
+                //$display("hello_11111111111111");
                 if(address != `RAM_IO_ADDRESS || LSB_rob_id[head] == io_rob_id_from_rob) begin
                     LSB_busy[head] <= `FALSE;
                     LSB_rob_id[head] <= `ZERO_ROB;
@@ -158,13 +160,14 @@ always @(posedge clk) begin
                     openum_to_lsu <= LSB_openum[head];
                     mem_address_to_lsu <= LSB_imm[head] + LSB_V1[head];
                     stored_data <= `ZERO_WORD;
+                    rob_id_to_LS_unit_cdb <= LSB_rob_id[head];
                     head <= next_head;
                 end
             end
             else begin
                 //store:
                 //clear LSB[head]:
-                $display("hello_22222222222");
+                //$display("hello_22222222222");
                 if(LSB_is_committed[head]) begin
                     LSB_busy[head] <= `FALSE;
                     LSB_rob_id[head] <= `ZERO_ROB;
@@ -180,6 +183,7 @@ always @(posedge clk) begin
                     openum_to_lsu <= LSB_openum[head];
                     mem_address_to_lsu <= LSB_imm[head] + LSB_V1[head];
                     stored_data <= LSB_V2[head];
+                    rob_id_to_LS_unit_cdb <= LSB_rob_id[head];
                     head <= next_head;
                 end
             end

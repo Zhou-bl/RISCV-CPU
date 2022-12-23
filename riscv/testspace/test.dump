@@ -27,10 +27,8 @@ Disassembly of section .text.startup:
     1024:	00e78023          	sb	a4,0(a5)
     1028:	00414703          	lbu	a4,4(sp)
     102c:	00e78023          	sb	a4,0(a5)
-    1030:	00a00713          	li	a4,10
-    1034:	00e78023          	sb	a4,0(a5)
-    1038:	01010113          	addi	sp,sp,16
-    103c:	00008067          	ret
+    1030:	01010113          	addi	sp,sp,16
+    1034:	00008067          	ret
 
 Disassembly of section .riscv.attributes:
 

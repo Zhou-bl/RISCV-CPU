@@ -71,6 +71,7 @@ always @(posedge clk) begin
     end else if (~rdy)begin
     end
     else if(misbranch_flag == `TRUE) begin
+        //$display("IF---> misbranch: ", pc);
         ok_to_dsp_signal <= `FALSE;
         pc <= target_pc_from_rob;
         pc_for_memctrl <= target_pc_from_rob;
@@ -78,6 +79,7 @@ always @(posedge clk) begin
         start_query_signal <= `FALSE;
     end
     else begin
+        //$display("IF---> non_misbranch: ", pc);
         start_query_signal <= `FALSE;
         if (is_hit_in_cache == `TRUE && global_full_signal == `FALSE) begin//往下传指令
             ok_to_dsp_signal <= `TRUE;

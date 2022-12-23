@@ -316,6 +316,7 @@ LS_buffer CPU_LS_buffer(
   .valid_signal_from_LS_unit_cdb(LS_unit_valid_signal),
   .rob_id_from_LS_unit_cdb(LS_unit_rob_id),
   .result_from_LS_unit_cdb(LS_unit_result),
+  .rob_id_to_LS_unit_cdb(LS_unit_rob_id),
 
   //port with lsu:
   .busy_signal_from_lsu(busy_signal_between_LSB_and_lsu),

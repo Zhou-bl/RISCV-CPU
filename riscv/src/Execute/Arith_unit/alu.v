@@ -197,7 +197,7 @@ always @(*) begin
             valid = `FALSE;
         end
     endcase
-    $display("valid: ", valid);
+    //$display("valid: ", valid);
 end
 
 endmodule
