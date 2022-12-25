@@ -35,28 +35,40 @@ integer i;
 
 always @(posedge clk) begin
     if(rst) begin
-      for(i = 0; i < BHT_SIZE - 1; i = i + 1) begin
-        branch_history_table[i] = STRONG_NT;
-      end
-    end
-    else if(is_jump_flag) begin //update BHT:
-      if(jumped_flag == 1) begin
-        if(branch_history_table[rob_pc[`ADDR_CUT_BP]] == WEAK_T) begin
-          branch_history_table[rob_pc[`ADDR_CUT_BP]] <= STRONG_T;
-        end else if(branch_history_table[rob_pc[`ADDR_CUT_BP]] == WEAK_NT) begin
-          branch_history_table[rob_pc[`ADDR_CUT_BP]] <= WEAK_T;
-        end else if(branch_history_table[rob_pc[`ADDR_CUT_BP]] == STRONG_NT) begin
-          branch_history_table[rob_pc[`ADDR_CUT_BP]] <= WEAK_NT;
+        for(i = 0; i < BHT_SIZE; i = i + 1) begin
+            branch_history_table[i] = WEAK_NT;
         end
-      end else begin
-        if(branch_history_table[rob_pc[`ADDR_CUT_BP]] == WEAK_NT) begin
-          branch_history_table[rob_pc[`ADDR_CUT_BP]] <= STRONG_NT;
-        end else if(branch_history_table[rob_pc[`ADDR_CUT_BP]] == WEAK_T) begin
-          branch_history_table[rob_pc[`ADDR_CUT_BP]] <= WEAK_NT;
-        end else if(branch_history_table[rob_pc[ `ADDR_CUT_BP]] == STRONG_T) begin
-          branch_history_table[rob_pc[`ADDR_CUT_BP]] <= WEAK_T;
-        end
-      end
     end
+    else if(is_update_flag) begin //update BHT:
+        if(jumped_flag) begin
+        
+            if(branch_history_table[rob_pc[`ADDR_CUT_BP]] == WEAK_T) begin
+                branch_history_table[rob_pc[`ADDR_CUT_BP]] <= STRONG_T;
+            end 
+            else if(branch_history_table[rob_pc[`ADDR_CUT_BP]] == WEAK_NT) begin
+                branch_history_table[rob_pc[`ADDR_CUT_BP]] <= WEAK_T;
+            end 
+            else if(branch_history_table[rob_pc[`ADDR_CUT_BP]] == STRONG_NT) begin
+                branch_history_table[rob_pc[`ADDR_CUT_BP]] <= WEAK_NT;
+            end
+        end 
+        else begin
+            if(branch_history_table[rob_pc[`ADDR_CUT_BP]] == WEAK_NT) begin
+                branch_history_table[rob_pc[`ADDR_CUT_BP]] <= STRONG_NT;
+            end 
+            else if(branch_history_table[rob_pc[`ADDR_CUT_BP]] == WEAK_T) begin
+                branch_history_table[rob_pc[`ADDR_CUT_BP]] <= WEAK_NT;
+            end 
+            else if(branch_history_table[rob_pc[`ADDR_CUT_BP]] == STRONG_T) begin
+                branch_history_table[rob_pc[`ADDR_CUT_BP]] <= WEAK_T;
+            end
+        end
+        
+        /*
+        branch_history_table[rob_pc[`ADDR_CUT_BP]] <= branch_history_table[rob_pc[`ADDR_CUT_BP]]
+        + ((jumped_flag) ? (branch_history_table[rob_pc[`ADDR_CUT_BP]] == STRONG_T ? 0 : 1) : 
+        (branch_history_table[rob_pc[`ADDR_CUT_BP]] == STRONG_NT ? 0 : -1));
+        */
+     end
 end
 endmodule

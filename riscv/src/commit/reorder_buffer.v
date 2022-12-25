@@ -77,7 +77,7 @@ wire commit_signal;
 
 assign alloced_rob_id_to_dispatcher = tail + 1;
 assign io_rob_id_to_lsb = ROB_busy[head] && ROB_is_IO[head] ? head + 1: `ZERO_ROB;
-assign full_signal = (cur_ROB_size >= `ROB_SIZE - 3);
+assign full_signal = (cur_ROB_size >= `ROB_SIZE - 6);
 assign commit_signal = ROB_busy[head] && (ROB_is_ready[head] || ROB_is_store[head]) ;
 assign Q1_ready_signal_to_dispatcher = Q1_from_dispatcher == `ZERO_ROB ? `FALSE : ROB_is_ready[Q1_from_dispatcher - 1];
 assign Q2_ready_signal_to_dispatcher = Q2_from_dispatcher == `ZERO_ROB ? `FALSE : ROB_is_ready[Q2_from_dispatcher - 1];
@@ -87,6 +87,11 @@ assign next_head = head == `ROB_SIZE - 1 ? 0 : head + 1;
 assign next_tail = tail == `ROB_SIZE - 1 ? 0 : tail + 1;
 
 integer i;
+
+wire [`ADDR_TYPE] debug_target_pc;
+wire [`ADDR_TYPE] debug_rollback_pc;
+assign debug_target_pc = ROB_target_pc[head];
+assign debug_rollback_pc = ROB_rollback_pc[head];
 
 always @(posedge clk) begin
     if(rst || misbranch_flag) begin

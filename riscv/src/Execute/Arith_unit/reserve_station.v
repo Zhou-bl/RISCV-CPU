@@ -141,7 +141,7 @@ always @(posedge clk) begin
             //$display("next_to_alu_index: ", next_to_alu_index);
             //$display("RS_busy: ", RS_busy[0]);
             //$display("RS_Q1: ", RS_Q1[0]);
-            openum_to_alu <= openum_from_dispatcher;
+            openum_to_alu <= RS_openum[next_to_alu_index];
             rob_id_to_Arith_unit_cdb <= RS_rob_id[next_to_alu_index];
             RS_busy[next_to_alu_index] <= `FALSE;
             V1_to_alu <= RS_V1[next_to_alu_index];

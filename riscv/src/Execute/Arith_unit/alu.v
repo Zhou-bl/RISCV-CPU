@@ -49,7 +49,7 @@ always @(*) begin
         `OPENUM_BNE:begin
             output_result = `ZERO_WORD;
             output_pc = input_pc + imm;
-            is_jump_flag = (V1 == V2);
+            is_jump_flag = (V1 != V2);
             valid = `TRUE;
         end
         `OPENUM_BLT:begin

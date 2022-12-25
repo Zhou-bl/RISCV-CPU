@@ -30,10 +30,12 @@ Disassembly of section .text.startup:
 
 Disassembly of section .rodata.str1.4:
 
-00001030 <__bss_end-0x6>:
+00001030 <__bss_end-0xc>:
     1030:	6568                	flw	fa0,76(a0)
     1032:	6c6c                	flw	fa1,92(s0)
-    1034:	          	j	1034 <main+0x34>
+    1034:	6f77206f          	j	73f2a <__heap_start+0x71f2a>
+    1038:	6c72                	flw	fs8,28(sp)
+    103a:	0064                	addi	s1,sp,12
 
 Disassembly of section .riscv.attributes:
 

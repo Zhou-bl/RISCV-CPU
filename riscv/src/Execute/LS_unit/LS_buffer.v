@@ -49,6 +49,10 @@ module LS_buffer(
 //[head, tail - 1]
 reg [`LSB_ID_TYPE] head, tail, cur_store_index;
 reg [`LSB_SIZE - 1 : 0] LSB_busy;
+
+reg [`ROB_ID_TYPE] debug_Q1, debug_Q2;
+reg [`OPENUM_TYPE] debug_openum;
+
 reg [`OPENUM_TYPE] LSB_openum [`LSB_SIZE - 1 : 0];
 reg [`ROB_ID_TYPE] LSB_Q1 [`LSB_SIZE - 1 : 0];
 reg [`ROB_ID_TYPE] LSB_Q2 [`LSB_SIZE - 1 : 0];
@@ -59,7 +63,7 @@ reg [`ROB_ID_TYPE] LSB_rob_id [`LSB_SIZE - 1 : 0];
 reg [`LSB_SIZE - 1 : 0] LSB_is_committed;
 //other variable: for IO...
 wire [`LSB_ID_TYPE] next_head, next_tail;
-wire address;
+wire [`ADDR_TYPE] address;
 wire send_to_lsu_signal;
 reg [`ROB_POS_TYPE] LSB_cur_size;
 wire [`ROB_ID_TYPE] updated_Q1, updated_Q2;
@@ -79,7 +83,7 @@ result_from_Arith_unit_cdb : (valid_signal_from_LS_unit_cdb && rob_id_from_LS_un
 result_from_LS_unit_cdb : V2_from_dispatcher);
 
 
-assign full_signal = (LSB_cur_size >= `LSB_SIZE - 3);
+assign full_signal = (LSB_cur_size >= `LSB_SIZE - 6);
 assign address = LSB_V1[head] + LSB_imm[head];
 assign io_rob_id_to_rob = address == `RAM_IO_ADDRESS ? LSB_rob_id[head] : `ZERO_ROB;
 assign next_head = head == `LSB_SIZE - 1 ? 0 : head + 1;
@@ -87,6 +91,8 @@ assign next_tail = tail == `LSB_SIZE - 1 ? 0 : tail + 1;
 
 assign send_to_lsu_signal = (LSB_busy[head] && busy_signal_from_lsu == `FALSE && LSB_Q1[head] == `ZERO_ROB && LSB_Q2[head] == `ZERO_ROB) && 
 (LSB_is_committed[head] || (LSB_openum[head] <= `OPENUM_LHU && (address != `RAM_IO_ADDRESS || io_rob_id_from_rob == LSB_rob_id[head])));
+
+
 
 integer i;
 
@@ -109,6 +115,9 @@ always @(posedge clk) begin
         enable_signal_to_lsu <= `FALSE;
     end else if(~rdy) begin
     end else begin
+        debug_Q1 <= LSB_Q1[head];
+        debug_Q2 <= LSB_Q2[head];
+        debug_openum <= LSB_openum[head];
         //1.将新的指令放入LSB中
         //2.将head所在的指令传给LSU
         //3.监听CDB总线更新LSB中的信息
@@ -141,7 +150,7 @@ always @(posedge clk) begin
 
         if(LSB_busy[head] && busy_signal_from_lsu == `FALSE && LSB_Q1[head] == `ZERO_ROB && LSB_Q2[head] == `ZERO_ROB) begin
             //$display("hello!!!!!!");
-            if (openum_from_dispatcher <= `OPENUM_LHU) begin
+            if (LSB_openum[head] <= `OPENUM_LHU) begin
                 //load:
                 //clear LSB[head]:
                 //$display("hello_11111111111111");

@@ -48,6 +48,7 @@ reg [`INT_TYPE] ram_access_cnt, ram_access_size; //cnt = 0 时发出了第一个
 reg [`ADDR_TYPE] ram_access_pc;
 reg [`DATA_TYPE] stored_data;
 wire both_query;
+reg is_IO, IO_lock;//for io output;
 
 assign both_query = start_access_mem_signal & start_query_signal;
 
@@ -63,6 +64,8 @@ always @(posedge clk) begin
         load_data_to_ls_ex <= `ZERO_WORD;
         finish_query_signal <= `FALSE;
         finish_rw_flag_to_ls_ex <= `FALSE;
+        is_IO <= `FALSE;
+        IO_lock <= `FALSE;
     end
     else if (~rdy) begin
         finish_query_signal <= `FALSE;
@@ -109,6 +112,7 @@ always @(posedge clk) begin
                     ram_access_pc <= access_address_from_ls_ex;
                     stored_data <= write_data_from_ls_ex;
                     read_or_write_flag_to_ram <= `WRITE_FLAG;
+                    is_IO <= (access_address_from_ls_ex == `RAM_IO_ADDRESS);
                     status <= STATUS_STORE;
                 end
                 if (read_or_write_flag_from_ls_ex == `READ_FLAG) begin
@@ -128,6 +132,7 @@ always @(posedge clk) begin
                     ram_access_pc <= buffered_access_address_from_ls_ex;
                     stored_data <= buffered_write_data_from_ls_ex;
                     read_or_write_flag_to_ram <= `WRITE_FLAG;
+                    is_IO <= (buffered_access_address_from_ls_ex == `RAM_IO_ADDRESS);
                     status <= STATUS_STORE;
                 end
                 if (buffered_read_or_write_flag_from_ls_ex == `READ_FLAG) begin
@@ -187,7 +192,7 @@ always @(posedge clk) begin
                         ram_access_cnt <= ram_access_cnt + 1; 
                     end
                 end
-                if (status == STATUS_LOAD) begin
+                else if (status == STATUS_LOAD) begin
                     access_address_to_ram <= ram_access_pc;
                     read_or_write_flag_to_ram <= `READ_FLAG;
                     case (ram_access_cnt)
@@ -214,24 +219,30 @@ always @(posedge clk) begin
                         ram_access_cnt <= ram_access_cnt + 1; 
                     end
                 end
-                if (status == STATUS_STORE) begin
-                    access_address_to_ram <= ram_access_pc;
-                    read_or_write_flag_to_ram <= `WRITE_FLAG;
-                    case (ram_access_cnt)
-                        0 : output_byte_to_ram <= stored_data[7:0];
-                        1 : output_byte_to_ram <= stored_data[15:8];
-                        2 : output_byte_to_ram <= stored_data[23:16];
-                        3 : output_byte_to_ram <= stored_data[31:24];
-                    endcase
-                    ram_access_pc <= ram_access_cnt >= ram_access_size - 1 ? `ZERO_WORD : ram_access_pc + 1;
-                    if (ram_access_cnt == ram_access_size) begin
-                        finish_rw_flag_to_ls_ex <= `TRUE;
-                        ram_access_pc <= `ZERO_ADDR;
-                        ram_access_cnt <= 0;
-                        access_address_to_ram <= `ZERO_ADDR;
-                        read_or_write_flag_to_ram <= `READ_FLAG;//闲置时改为read mode
-                        status <= STATUS_IDLE;
-                    end else begin ram_access_cnt <= ram_access_cnt + 1; end
+                else if (status == STATUS_STORE) begin
+                    if(!is_IO || !IO_lock) begin
+                        IO_lock <= `TRUE;
+                        access_address_to_ram <= ram_access_pc;
+                        read_or_write_flag_to_ram <= `WRITE_FLAG;
+                        case (ram_access_cnt)
+                            0 : output_byte_to_ram <= stored_data[7:0];
+                            1 : output_byte_to_ram <= stored_data[15:8];
+                            2 : output_byte_to_ram <= stored_data[23:16];
+                            3 : output_byte_to_ram <= stored_data[31:24];
+                        endcase
+                        ram_access_pc <= ram_access_cnt >= ram_access_size - 1 ? `ZERO_WORD : ram_access_pc + 1;
+                        if (ram_access_cnt == ram_access_size) begin
+                            finish_rw_flag_to_ls_ex <= `TRUE;
+                            ram_access_pc <= `ZERO_ADDR;
+                            ram_access_cnt <= 0;
+                            access_address_to_ram <= `ZERO_ADDR;
+                            read_or_write_flag_to_ram <= `READ_FLAG;//闲置时改为read mode
+                            status <= STATUS_IDLE;
+                        end else begin ram_access_cnt <= ram_access_cnt + 1; end
+                    end
+                    else begin
+                        IO_lock <= `FALSE;
+                    end
                 end
             end
         end

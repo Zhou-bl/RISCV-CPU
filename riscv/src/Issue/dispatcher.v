@@ -131,9 +131,9 @@ assign Q1 = (valid_from_Arith_unit_cdb == `TRUE && Q1_from_reg == rob_id_from_Ar
 `ZERO_ROB : (Q1_ready_from_rob == `TRUE ? 
 `ZERO_ROB : (Q1_from_reg)));
 
-assign Q2 = (valid_from_Arith_unit_cdb && Q2_from_reg == rob_id_from_Arith_unit_cdb) ?
-`ZERO_ROB : ((valid_from_LS_unit_cdb && Q2_from_reg == rob_id_from_LS_unit_cdb) ? 
-`ZERO_ROB : (Q2_ready_from_rob ? 
+assign Q2 = (valid_from_Arith_unit_cdb == `TRUE && Q2_from_reg == rob_id_from_Arith_unit_cdb) ?
+`ZERO_ROB : ((valid_from_LS_unit_cdb == `TRUE && Q2_from_reg == rob_id_from_LS_unit_cdb) ? 
+`ZERO_ROB : (Q2_ready_from_rob == `TRUE ? 
 `ZERO_ROB : (Q2_from_reg)));
 
 assign V1 = (valid_from_Arith_unit_cdb && Q1_from_reg == rob_id_from_Arith_unit_cdb) ?
@@ -141,7 +141,7 @@ result_from_Arith_unit_cdb : ((valid_from_LS_unit_cdb && Q1_from_reg == rob_id_f
 result_from_LS_unit_cdb : ((Q1_ready_from_rob ? 
 V1_result_from_rob : V1_from_reg)));
 
-assign V2 = (valid_from_LS_unit_cdb && Q2_from_reg == rob_id_from_Arith_unit_cdb) ?
+assign V2 = (valid_from_Arith_unit_cdb && Q2_from_reg == rob_id_from_Arith_unit_cdb) ?
 result_from_Arith_unit_cdb : ((valid_from_LS_unit_cdb && Q2_from_reg == rob_id_from_LS_unit_cdb) ?
 result_from_LS_unit_cdb : ((Q2_ready_from_rob ?
 V2_result_from_rob : V2_from_reg)));
@@ -182,6 +182,7 @@ always @(posedge clk) begin
         is_jump_signal_to_rob <= is_jump_from_decoder;
         is_store_signal_to_rob <= is_store_from_decoder;
         predicted_jump_result_to_rob <= predicted_jump_flag_from_if;
+        rollback_pc_to_rob <= rollback_pc_from_if;
         
         if(openum_from_decoder >= `OPENUM_LB && openum_from_decoder <= `OPENUM_SW) begin
             
