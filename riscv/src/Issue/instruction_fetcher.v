@@ -52,6 +52,8 @@ assign pc_to_bp = pc;
 
 integer i;
 
+//initial a_file = $fopen("M1.txt");
+
 always @(posedge clk) begin
     if(rst) begin//initial:
         fetcher_status <= IDLE;
@@ -82,6 +84,7 @@ always @(posedge clk) begin
         stop_signal <= `TRUE;
     end
     else begin
+        //$fdisplay(a_file,"%d",SumMagnituder);
         //$display("IF---> non_misbranch: ", pc);
         stop_signal <= `FALSE;
         start_query_signal <= `FALSE;

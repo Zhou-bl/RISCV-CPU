@@ -4,247 +4,246 @@ module memory_controller(
     input wire rst,
     input wire rdy,
 
-    //port with RAM:
+    //port with ram
     input wire io_buffer_full_signal,
+    input wire [`MEMPORT_TYPE] input_byte_from_ram,
     output reg read_or_write_flag_to_ram,
     output reg [`ADDR_TYPE] access_address_to_ram,
-    input wire [`MEMPORT_TYPE] input_byte_from_ram,
     output reg [`MEMPORT_TYPE] output_byte_to_ram,
 
-    //port with IF:
-    input wire start_query_signal,//脉冲
+    //port with if:
     input wire [`ADDR_TYPE] pc_from_if,
+    input wire start_query_signal,
     input wire stop_signal,
-    output reg finish_query_signal,//脉冲
+    output reg finish_query_signal,
     output reg [`INST_TYPE] output_inst_to_if,
 
-    //port with ls_ex:
-    input wire start_access_mem_signal,//脉冲
-    input wire read_or_write_flag_from_ls_ex,//read:0   write:1;
-    input wire [2:0] rw_length_from_ls_ex,
+    //port with lsu:
     input wire [`ADDR_TYPE] access_address_from_ls_ex,
     input wire [`DATA_TYPE] write_data_from_ls_ex,
+    input wire start_access_mem_signal,
+    input wire read_or_write_flag_from_ls_ex,
+    input wire [2:0] rw_length_from_ls_ex,
     output reg finish_rw_flag_to_ls_ex,
     output reg [`DATA_TYPE] load_data_to_ls_ex
 );
-//define status:
-localparam STATUS_IDLE = 0, STATUS_FETCH = 1, STATUS_LOAD = 2, STATUS_STORE = 3;
+
+//define IF message:
+parameter STATUS_IDLE = 0, STATUS_FETCH = 1, STATUS_LOAD = 2, STATUS_STORE = 3;
 
 //因为instruction fetch和ls可能同时到达，需要缓存一下脉冲数据。
 //buffered IF message:
 reg buffered_start_query_signal;
 reg [`ADDR_TYPE] buffered_pc_from_if;
-//buffered ls_ex message:
+//buffer ls_ex message:
 reg buffered_start_access_mem_signal;
 reg buffered_read_or_write_flag_from_ls_ex;
-reg [2:0] buffered_rw_length_from_ls_ex;
+reg [2: 0] buffered_rw_length_from_ls_ex;
 reg [`ADDR_TYPE] buffered_access_address_from_ls_ex;
-reg [`DATA_TYPE] buffered_write_data_from_ls_ex;
-//记录当前memCtlr的状态
+reg [`ADDR_TYPE] buffered_write_data_from_ls_ex;
+reg uart_write_is_io, uart_write_lock;
 reg [`STATUS_TYPE] status;
-//记录当前正在access第几个字节，总共需要access多少字节
-reg [`INT_TYPE] ram_access_cnt, ram_access_size; //cnt = 0 时发出了第一个字节的请求, cnt = ran_access_size - 1 时发出了最后一个字节的请求
-//记录下一个access的字节的位置
+reg [`INT_TYPE] ram_access_cnt, ram_access_size;
 reg [`ADDR_TYPE] ram_access_pc;
-reg [`DATA_TYPE] stored_data;
-wire both_query;
-reg is_IO, IO_lock;//for io output;
+reg [`DATA_TYPE] writing_data;
 
-assign both_query = start_access_mem_signal & start_query_signal;
+reg ena_output_status, ena_output_fetch_valid, ena_output_ls_valid;
+
+wire [`STATUS_TYPE] status_magic = (ena_output_status) ? STATUS_IDLE : status;
+wire buf_fetch_valid_magic = (ena_output_fetch_valid) ? `FALSE : buffered_start_query_signal;
+wire buf_ls_valid_magic = (ena_output_ls_valid) ? `FALSE : buffered_start_access_mem_signal;
 
 always @(posedge clk) begin
-    if (rst) begin
+    if (rst == `TRUE) begin
         status <= STATUS_IDLE;
         ram_access_cnt <= `ZERO_WORD;
         ram_access_size <= `ZERO_WORD;
         ram_access_pc <= `ZERO_ADDR;
         buffered_start_query_signal <= `FALSE;
         buffered_start_access_mem_signal <= `FALSE;
-        output_inst_to_if <= `ZERO_WORD;
+        output_inst_to_if <= `ZERO_ADDR;
         load_data_to_ls_ex <= `ZERO_WORD;
-        finish_query_signal <= `FALSE;
-        finish_rw_flag_to_ls_ex <= `FALSE;
-        is_IO <= `FALSE;
-        IO_lock <= `FALSE;
+        uart_write_is_io <= `FALSE;
+        uart_write_lock <= `FALSE;
     end
     else if (~rdy) begin
-        finish_query_signal <= `FALSE;
-        finish_rw_flag_to_ls_ex <= `FALSE;
     end
     else begin
-        if(stop_signal == `TRUE) begin
-            if(status == STATUS_FETCH || status == STATUS_LOAD) begin
-                status <= STATUS_IDLE;
-            end
-            buffered_start_query_signal <= `FALSE;
-            if(buffered_start_access_mem_signal == `TRUE && buffered_read_or_write_flag_from_ls_ex == `READ_FLAG) begin
-                buffered_start_access_mem_signal <= `FALSE;
-            end
-        end
-        if (status != STATUS_IDLE  || (start_query_signal && start_access_mem_signal)) begin
-            //同时来两个信号或者memctrl处于忙碌状态时:
-            //buffer the message:
+        finish_query_signal <= `FALSE;
+        finish_rw_flag_to_ls_ex <= `FALSE;
+        
+        access_address_to_ram <= `ZERO_ADDR;
+        read_or_write_flag_to_ram <= `READ_FLAG;
+
+        if (ena_output_status) status <= STATUS_IDLE;
+        if (ena_output_fetch_valid) buffered_start_query_signal <= `FALSE;
+        if (ena_output_ls_valid) buffered_start_access_mem_signal <= `FALSE;
+
+        //buffered the query from instruction or lsu:
+        if (status_magic != STATUS_IDLE || (start_access_mem_signal && start_query_signal)) begin
             if (start_query_signal == `FALSE && start_access_mem_signal == `TRUE) begin
-                //此时只有 mem_access 信号
                 buffered_start_access_mem_signal <= `TRUE;
                 buffered_read_or_write_flag_from_ls_ex <= read_or_write_flag_from_ls_ex;
-                buffered_rw_length_from_ls_ex <= rw_length_from_ls_ex;
                 buffered_access_address_from_ls_ex <= access_address_from_ls_ex;
                 buffered_write_data_from_ls_ex <= write_data_from_ls_ex;
+                buffered_rw_length_from_ls_ex <= rw_length_from_ls_ex;
             end
             else if (start_query_signal == `TRUE) begin
-                //两种情况：1.两种信号都来；2.在busy时if来信号
                 buffered_start_query_signal <= `TRUE;
                 buffered_pc_from_if <= pc_from_if;
             end
         end
 
-        if (status == STATUS_IDLE) begin //IDLE
+        if (status_magic == STATUS_IDLE) begin 
             finish_query_signal <= `FALSE;
             finish_rw_flag_to_ls_ex <= `FALSE;
-            output_inst_to_if <= `ZERO_WORD;
+            output_inst_to_if <= `ZERO_ADDR;
             load_data_to_ls_ex <= `ZERO_WORD;
-
             if (start_access_mem_signal == `TRUE) begin
                 if (read_or_write_flag_from_ls_ex == `WRITE_FLAG) begin
-                    ram_access_cnt <= 0;
+                    ram_access_cnt <= `ZERO_WORD;
                     ram_access_size <= rw_length_from_ls_ex;
+                    writing_data <= write_data_from_ls_ex;
+                    access_address_to_ram <= `ZERO_ADDR;
                     ram_access_pc <= access_address_from_ls_ex;
-                    stored_data <= write_data_from_ls_ex;
                     read_or_write_flag_to_ram <= `WRITE_FLAG;
-                    is_IO <= (access_address_from_ls_ex == `RAM_IO_ADDRESS);
+                    uart_write_is_io <= (access_address_from_ls_ex == `RAM_IO_ADDRESS);
+                    uart_write_lock <= `FALSE;
                     status <= STATUS_STORE;
                 end
-                if (read_or_write_flag_from_ls_ex == `READ_FLAG) begin
-                    ram_access_cnt <= 0;
+                else if (read_or_write_flag_from_ls_ex == `READ_FLAG) begin
+                    ram_access_cnt <= `ZERO_WORD;
                     ram_access_size <= rw_length_from_ls_ex;
-                    ram_access_pc <= access_address_from_ls_ex + 1;
                     access_address_to_ram <= access_address_from_ls_ex;
+                    ram_access_pc <= access_address_from_ls_ex + 32'h1;
                     read_or_write_flag_to_ram <= `READ_FLAG;
                     status <= STATUS_LOAD;
                 end
             end
-            else if (buffered_start_access_mem_signal == `TRUE) begin
+            else if (buf_ls_valid_magic) begin
                 if (buffered_read_or_write_flag_from_ls_ex == `WRITE_FLAG) begin
-                    //设置moule的状态为store, 但是不向ram传送mem access的信号
-                    ram_access_cnt <= 0;
+                    ram_access_cnt <= `ZERO_WORD;
                     ram_access_size <= buffered_rw_length_from_ls_ex;
+                    writing_data <= buffered_write_data_from_ls_ex;
+                    access_address_to_ram <= `ZERO_ADDR;
                     ram_access_pc <= buffered_access_address_from_ls_ex;
-                    stored_data <= buffered_write_data_from_ls_ex;
                     read_or_write_flag_to_ram <= `WRITE_FLAG;
-                    is_IO <= (buffered_access_address_from_ls_ex == `RAM_IO_ADDRESS);
                     status <= STATUS_STORE;
-                end
-                if (buffered_read_or_write_flag_from_ls_ex == `READ_FLAG) begin
-                    ram_access_cnt <= 0;
+                end    
+                else if (buffered_read_or_write_flag_from_ls_ex == `READ_FLAG) begin
+                    ram_access_cnt <= `ZERO_WORD;
                     ram_access_size <= buffered_rw_length_from_ls_ex;
-                    ram_access_pc <= buffered_access_address_from_ls_ex + 1;
                     access_address_to_ram <= buffered_access_address_from_ls_ex;
+                    ram_access_pc <= buffered_access_address_from_ls_ex + 32'h1;
                     read_or_write_flag_to_ram <= `READ_FLAG;
                     status <= STATUS_LOAD;
                 end
                 buffered_start_access_mem_signal <= `FALSE;
             end
-            else if(start_query_signal == `TRUE) begin
-                ram_access_cnt <= 0;
-                ram_access_size <= 4;
-                ram_access_pc <= pc_from_if + 1;
+            else if (start_query_signal == `TRUE) begin
+                ram_access_cnt <= `ZERO_WORD;
+                ram_access_size <= 32'h4;
                 access_address_to_ram <= pc_from_if;
+                ram_access_pc <= pc_from_if + 32'h1;
                 read_or_write_flag_to_ram <= `READ_FLAG;
                 status <= STATUS_FETCH;
             end
-            else if (buffered_start_query_signal == `TRUE) begin
-                ram_access_cnt <= 0;
-                ram_access_size <= 4;
-                ram_access_pc <= buffered_pc_from_if + 1;
+            else if (buf_fetch_valid_magic) begin
+                ram_access_cnt <= `ZERO_WORD;
+                ram_access_size <= 32'h4;
                 access_address_to_ram <= buffered_pc_from_if;
+                ram_access_pc <= buffered_pc_from_if + 32'h1;
                 read_or_write_flag_to_ram <= `READ_FLAG;
                 status <= STATUS_FETCH;
                 buffered_start_query_signal <= `FALSE;
             end
         end
-        else begin// busy
-            if (io_buffer_full_signal == `FALSE) begin
-                if (status == STATUS_FETCH) begin
-                    access_address_to_ram <= ram_access_pc;
-                    read_or_write_flag_to_ram <= `READ_FLAG;
-                    case (ram_access_cnt)
-                        1 : output_inst_to_if[7 : 0] <= input_byte_from_ram;
-                        2 : output_inst_to_if[15 : 8] <= input_byte_from_ram;
-                        3 : output_inst_to_if[23 : 16] <= input_byte_from_ram;
-                        4 : output_inst_to_if[31 : 24] <= input_byte_from_ram;
-                    endcase
-                    if (ram_access_cnt < ram_access_size - 1) begin
-                        ram_access_pc <= ram_access_pc + 1;
-                    end
-                    else begin
-                        ram_access_pc <= `ZERO_ADDR;
-                    end
-                    //ram_access_pc <= (ram_access_cnt >= ram_access_size - 1) ? `ZERO_ADDR : ram_access_pc + 1;
-                    if (ram_access_cnt == ram_access_size) begin
-                        //finish_query_signal <= `TRUE;
-                        finish_query_signal <= ~stop_signal;
-                        ram_access_pc <= `ZERO_ADDR;
-                        ram_access_cnt <= 0;
-                        status <= STATUS_IDLE;
-                    end 
-                    else begin 
-                        ram_access_cnt <= ram_access_cnt + 1; 
-                    end
+        else if (!(io_buffer_full_signal && status_magic == STATUS_STORE)) begin
+            if (status_magic == STATUS_FETCH) begin
+                access_address_to_ram <= ram_access_pc;
+                read_or_write_flag_to_ram <= `READ_FLAG;
+                case (ram_access_cnt)
+                    32'h1:  output_inst_to_if[7:0] <= input_byte_from_ram;
+                    32'h2:  output_inst_to_if[15:8] <= input_byte_from_ram;
+                    32'h3:  output_inst_to_if[23:16] <= input_byte_from_ram;
+                    32'h4:  output_inst_to_if[31:24] <= input_byte_from_ram;
+                endcase
+                ram_access_pc <= (ram_access_cnt >= ram_access_size - 32'h1) ? `ZERO_ADDR : ram_access_pc + 32'h1;
+                if (ram_access_cnt == ram_access_size) begin
+                    finish_query_signal <= ~stop_signal;
+                    status <= STATUS_IDLE;
+                    ram_access_pc <= `ZERO_ADDR;
+                    ram_access_cnt <= `ZERO_WORD;
                 end
-                else if (status == STATUS_LOAD) begin
-                    access_address_to_ram <= ram_access_pc;
-                    read_or_write_flag_to_ram <= `READ_FLAG;
-                    case (ram_access_cnt)
-                        1 : load_data_to_ls_ex[7 : 0] <= input_byte_from_ram;
-                        2 : load_data_to_ls_ex[15 : 8] <= input_byte_from_ram;
-                        3 : load_data_to_ls_ex[23 : 16] <= input_byte_from_ram;
-                        4 : load_data_to_ls_ex[31 : 24] <= input_byte_from_ram;
-                    endcase
-                    if (ram_access_cnt < ram_access_size - 1) begin
-                        ram_access_pc <= ram_access_pc + 1;
-                    end
-                    else begin
-                        ram_access_pc <= `ZERO_ADDR;
-                    end
-                    //ram_access_pc <= (ram_access_cnt >= ram_access_size - 1) ? `ZERO_WORD : ram_access_pc + 1;
-                    if (ram_access_cnt == ram_access_size) begin
-                        //finish_rw_flag_to_ls_ex <= `TRUE;
-                        finish_rw_flag_to_ls_ex <= ~stop_signal;
-                        ram_access_pc <= `ZERO_WORD;
-                        ram_access_cnt <= 0;
-                        status <= STATUS_IDLE;
-                    end 
-                    else begin 
-                        ram_access_cnt <= ram_access_cnt + 1; 
-                    end
-                end
-                else if (status == STATUS_STORE) begin
-                    if(!is_IO || !IO_lock) begin
-                        IO_lock <= `TRUE;
-                        access_address_to_ram <= ram_access_pc;
-                        read_or_write_flag_to_ram <= `WRITE_FLAG;
-                        case (ram_access_cnt)
-                            0 : output_byte_to_ram <= stored_data[7:0];
-                            1 : output_byte_to_ram <= stored_data[15:8];
-                            2 : output_byte_to_ram <= stored_data[23:16];
-                            3 : output_byte_to_ram <= stored_data[31:24];
-                        endcase
-                        ram_access_pc <= ram_access_cnt >= ram_access_size - 1 ? `ZERO_WORD : ram_access_pc + 1;
-                        if (ram_access_cnt == ram_access_size) begin
-                            finish_rw_flag_to_ls_ex <= `TRUE;
-                            ram_access_pc <= `ZERO_ADDR;
-                            ram_access_cnt <= 0;
-                            access_address_to_ram <= `ZERO_ADDR;
-                            read_or_write_flag_to_ram <= `READ_FLAG;//闲置时改为read mode
-                            status <= STATUS_IDLE;
-                        end else begin ram_access_cnt <= ram_access_cnt + 1; end
-                    end
-                    else begin
-                        IO_lock <= `FALSE;
-                    end
+                else begin
+                    ram_access_cnt <= ram_access_cnt + 32'h1;
                 end
             end
+            else if (status_magic == STATUS_LOAD) begin
+                access_address_to_ram <= ram_access_pc;
+                read_or_write_flag_to_ram <= `READ_FLAG;
+                case (ram_access_cnt)
+                    32'h1:  load_data_to_ls_ex[7:0] <= input_byte_from_ram;
+                    32'h2:  load_data_to_ls_ex[15:8] <= input_byte_from_ram;
+                    32'h3:  load_data_to_ls_ex[23:16] <= input_byte_from_ram;
+                    32'h4:  load_data_to_ls_ex[31:24] <= input_byte_from_ram;
+                endcase
+                ram_access_pc <= (ram_access_cnt >= ram_access_size - 1) ? `ZERO_ADDR : ram_access_pc + 1;
+
+                if (ram_access_cnt == ram_access_size) begin
+                    finish_rw_flag_to_ls_ex <= ~stop_signal;
+                    status <= STATUS_IDLE;
+                    ram_access_pc <= `ZERO_ADDR;
+                    ram_access_cnt <= 0;
+                end
+                else begin
+                    ram_access_cnt <= ram_access_cnt + 1;
+                end
+            end
+            else if (status_magic == STATUS_STORE) begin
+                if (uart_write_is_io == `FALSE || ~uart_write_lock) begin
+                    uart_write_lock <= `TRUE;
+                    access_address_to_ram <= ram_access_pc;
+                    read_or_write_flag_to_ram <= `WRITE_FLAG;
+                    case (ram_access_cnt)
+                        32'h0:  output_byte_to_ram <= writing_data[7:0];
+                        32'h1:  output_byte_to_ram <= writing_data[15:8];
+                        32'h2:  output_byte_to_ram <= writing_data[23:16];
+                        32'h3:  output_byte_to_ram <= writing_data[31:24];
+                    endcase
+                    ram_access_pc <= (ram_access_cnt >= ram_access_size - 32'h1) ? `ZERO_ADDR : ram_access_pc + 32'h1;
+                    if (ram_access_cnt == ram_access_size) begin
+                        finish_rw_flag_to_ls_ex <= `TRUE;
+                        status <= STATUS_IDLE;
+                        ram_access_pc <= `ZERO_ADDR;
+                        ram_access_cnt <= `ZERO_WORD;
+                        access_address_to_ram <= `ZERO_ADDR;
+                        read_or_write_flag_to_ram <= `READ_FLAG;
+                    end
+                    else begin
+                        ram_access_cnt <= ram_access_cnt + 32'h1;
+                    end
+                end
+                else begin
+                    uart_write_lock <= `FALSE;
+                end
+            end
+        end
+    end
+end
+
+always @(*) begin
+    ena_output_status = `FALSE;
+    ena_output_ls_valid = `FALSE;
+    ena_output_fetch_valid = `FALSE;
+
+    if (stop_signal) begin
+        if (status == STATUS_FETCH || status == STATUS_LOAD) begin
+            ena_output_status = `TRUE;
+        end
+        ena_output_fetch_valid = `TRUE;
+        if (buffered_start_access_mem_signal == `TRUE && buffered_read_or_write_flag_from_ls_ex == `READ_FLAG) begin
+            ena_output_ls_valid = `TRUE;
         end
     end
 end

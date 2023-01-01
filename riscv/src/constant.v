@@ -110,17 +110,17 @@
     //U-Type
 `define OPENUM_LUI     6'd1
 `define OPENUM_AUIPC   6'd2
-    //J-Type
+
 `define OPENUM_JAL     6'd3
 `define OPENUM_JALR    6'd4
-    //B-Type
+
 `define OPENUM_BEQ     6'd5
 `define OPENUM_BNE     6'd6
 `define OPENUM_BLT     6'd7 
 `define OPENUM_BGE     6'd8
 `define OPENUM_BLTU    6'd9 
 `define OPENUM_BGEU    6'd10 
-    //I-Type and S-Type
+
 `define OPENUM_LB      6'd11 
 `define OPENUM_LH      6'd12 
 `define OPENUM_LW      6'd13 
@@ -129,27 +129,27 @@
 `define OPENUM_SB      6'd16 
 `define OPENUM_SH      6'd17 
 `define OPENUM_SW      6'd18 
-    //I-Type
-`define OPENUM_ADDI    6'd19
-`define OPENUM_SLTI    6'd20
-`define OPENUM_SLTIU   6'd21
-`define OPENUM_XORI    6'd22
-`define OPENUM_ORI     6'd23
-`define OPENUM_ANDI    6'd24
-`define OPENUM_SLLI    6'd25
-`define OPENUM_SRLI    6'd26
-`define OPENUM_SRAI    6'd27
-    //R-Type
-`define OPENUM_ADD     6'd28
-`define OPENUM_SUB     6'd29
-`define OPENUM_SLL     6'd30
-`define OPENUM_SLT     6'd31
-`define OPENUM_SLTU    6'd32
-`define OPENUM_XOR     6'd33
-`define OPENUM_SRL     6'd34
-`define OPENUM_SRA     6'd35
-`define OPENUM_OR      6'd36
-`define OPENUM_AND     6'd37
 
+`define OPENUM_ADD     6'd19 
+`define OPENUM_SUB     6'd20 
+`define OPENUM_SLL     6'd21 
+`define OPENUM_SLT     6'd22 
+`define OPENUM_SLTU    6'd23 
+`define OPENUM_XOR     6'd24 
+`define OPENUM_SRL     6'd25 
+`define OPENUM_SRA     6'd26
+`define OPENUM_OR      6'd27 
+`define OPENUM_AND     6'd28
+
+`define OPENUM_ADDI    6'd29
+`define OPENUM_SLTI    6'd30
+`define OPENUM_SLTIU   6'd31
+`define OPENUM_XORI    6'd32
+`define OPENUM_ORI     6'd33
+`define OPENUM_ANDI    6'd34
+`define OPENUM_SLLI    6'd35
+`define OPENUM_SRLI    6'd36
+`define OPENUM_SRAI    6'd37
 //FOR IO:
 `define RAM_IO_ADDRESS 32'h30000
+`define FULL_WARNING 6

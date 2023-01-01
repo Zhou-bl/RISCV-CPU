@@ -1,225 +1,236 @@
 `include "/mnt/c/Users/zbl/Desktop/RISCV-CPU/riscv/src/constant.v"
 
-//为保证顺序执行，LSB需要实现为一个循环队列:
-module LS_buffer(
+//为保证顺序执行，LSB需要实现为一个循环队列;
+
+module LS_buffer (
     input wire clk,
     input wire rst,
     input wire rdy,
 
-    //port with dispatcher:
+    // from dispatcher
     input wire enable_signal_from_dispatcher,
     input wire [`OPENUM_TYPE] openum_from_dispatcher,
-    input wire [`ROB_ID_TYPE] Q1_from_dispatcher,
-    input wire [`ROB_ID_TYPE] Q2_from_dispatcher,
     input wire [`DATA_TYPE] V1_from_dispatcher,
     input wire [`DATA_TYPE] V2_from_dispatcher,
-    input wire [`ROB_ID_TYPE] rob_id_from_dispatcher,
+    input wire [`ROB_ID_TYPE] Q1_from_dispatcher,
+    input wire [`ROB_ID_TYPE] Q2_from_dispatcher,
     input wire [`DATA_TYPE] imm_from_dispatcher,
-
-    //port with Arith_unit cdb:
-    input wire valid_signal_from_Arith_unit_cdb,
-    input wire [`ROB_ID_TYPE] rob_id_from_Arith_unit_cdb,
-    input wire [`DATA_TYPE] result_from_Arith_unit_cdb,
- 
-    //port with LS_unit cdb:
-    input wire valid_signal_from_LS_unit_cdb,
-    input wire [`ROB_ID_TYPE] rob_id_from_LS_unit_cdb,
-    input wire [`DATA_TYPE] result_from_LS_unit_cdb,
-    output reg [`ROB_ID_TYPE] rob_id_to_LS_unit_cdb,
+    input wire [`ROB_ID_TYPE] rob_id_from_dispatcher,
     
-    //port with lsu:
-    input wire busy_signal_from_lsu,
+    // to if
+    output wire full_signal,
+
+    // to ls ex
     output reg enable_signal_to_lsu,
     output reg [`OPENUM_TYPE] openum_to_lsu,
     output reg [`ADDR_TYPE] mem_address_to_lsu,
     output reg [`DATA_TYPE] stored_data,
+    // to cdb
+    output reg [`ROB_ID_TYPE] rob_id_to_LS_unit_cdb,
 
+    // from ls ex
+    input wire busy_signal_from_lsu,
 
-    //port with rob: store指令需要commit之后才能做
+    // update when commit
+    // from rob
     input wire commit_signal,
     input wire [`ROB_ID_TYPE] commit_rob_id_from_rob,
     input wire [`ROB_ID_TYPE] io_rob_id_from_rob,
+
+    // from rs cdb
+    input wire valid_signal_from_Arith_unit_cdb,
+    input wire [`ROB_ID_TYPE] rob_id_from_Arith_unit_cdb,
+    input wire [`DATA_TYPE] result_from_Arith_unit_cdb,
+
+    // from ls cdb
+    input wire valid_signal_from_LS_unit_cdb,
+    input wire [`ROB_ID_TYPE] rob_id_from_LS_unit_cdb,
+    input wire [`DATA_TYPE] result_from_LS_unit_cdb,
+
+    // to rob: notify io
     output wire [`ROB_ID_TYPE] io_rob_id_to_rob,
 
-    output wire full_signal,
+    // jump_flag
     input wire misbranch_flag
 );
 
-//LSB:
-//[head, tail - 1]
-reg [`LSB_ID_TYPE] head, tail, cur_store_index;
+reg [`LSB_ID_TYPE] head, tail, store_tail;
+wire [`LSB_ID_TYPE] next_head, next_tail;
+
 reg [`LSB_SIZE - 1 : 0] LSB_busy;
-
-reg [`ROB_ID_TYPE] debug_Q1, debug_Q2;
-reg [`OPENUM_TYPE] debug_openum;
-
+reg [`ROB_ID_TYPE] LSB_rob_id [`LSB_SIZE - 1 : 0];
 reg [`OPENUM_TYPE] LSB_openum [`LSB_SIZE - 1 : 0];
 reg [`ROB_ID_TYPE] LSB_Q1 [`LSB_SIZE - 1 : 0];
 reg [`ROB_ID_TYPE] LSB_Q2 [`LSB_SIZE - 1 : 0];
 reg [`DATA_TYPE] LSB_V1 [`LSB_SIZE - 1 : 0];
 reg [`DATA_TYPE] LSB_V2 [`LSB_SIZE - 1 : 0];
 reg [`DATA_TYPE] LSB_imm [`LSB_SIZE - 1 : 0];
-reg [`ROB_ID_TYPE] LSB_rob_id [`LSB_SIZE - 1 : 0];
-reg [`LSB_SIZE - 1 : 0] LSB_is_committed;
-//other variable: for IO...
-wire [`LSB_ID_TYPE] next_head, next_tail;
-wire [`ADDR_TYPE] address;
-wire send_to_lsu_signal;
-reg [`ROB_POS_TYPE] LSB_cur_size;
-wire [`ROB_ID_TYPE] updated_Q1, updated_Q2;
-wire [`DATA_TYPE] updated_V1, updated_V2;
+reg [`LSB_SIZE - 1 : 0] LSB_is_committed;//for store and IO;
 
-assign updated_Q1 = valid_signal_from_Arith_unit_cdb && rob_id_from_Arith_unit_cdb == Q1_from_dispatcher ?
-`ZERO_ROB : (valid_signal_from_LS_unit_cdb && Q1_from_dispatcher == rob_id_from_LS_unit_cdb ? 
-`ZERO_ROB : Q1_from_dispatcher);
-assign updated_Q2 = valid_signal_from_Arith_unit_cdb && rob_id_from_Arith_unit_cdb == Q2_from_dispatcher ? 
-`ZERO_ROB : (valid_signal_from_LS_unit_cdb && Q2_from_dispatcher == rob_id_from_LS_unit_cdb ? 
-`ZERO_ROB : Q2_from_dispatcher);
-assign updated_V1 = valid_signal_from_Arith_unit_cdb && rob_id_from_Arith_unit_cdb == Q1_from_dispatcher ?
-result_from_Arith_unit_cdb : (valid_signal_from_LS_unit_cdb && rob_id_from_LS_unit_cdb == Q2_from_dispatcher ? 
-result_from_LS_unit_cdb : V1_from_dispatcher);
-assign updated_V2 = valid_signal_from_Arith_unit_cdb && rob_id_from_Arith_unit_cdb == Q1_from_dispatcher ? 
-result_from_Arith_unit_cdb : (valid_signal_from_LS_unit_cdb && rob_id_from_LS_unit_cdb == Q2_from_dispatcher ?
-result_from_LS_unit_cdb : V2_from_dispatcher);
+wire [`ADDR_TYPE] mem_address = LSB_V1[head] + LSB_imm[head];
 
 
-assign full_signal = (LSB_cur_size >= `LSB_SIZE - 6);
-assign address = LSB_V1[head] + LSB_imm[head];
-assign io_rob_id_to_rob = address == `RAM_IO_ADDRESS ? LSB_rob_id[head] : `ZERO_ROB;
-assign next_head = head == `LSB_SIZE - 1 ? 0 : head + 1;
-assign next_tail = tail == `LSB_SIZE - 1 ? 0 : tail + 1;
+reg [`ROB_POS_TYPE] lsb_element_cnt;
+wire ls_full_signal;
+wire [`INT_TYPE] insert_cnt;
+wire [`INT_TYPE] issue_cnt;
 
-assign send_to_lsu_signal = (LSB_busy[head] && busy_signal_from_lsu == `FALSE && LSB_Q1[head] == `ZERO_ROB && LSB_Q2[head] == `ZERO_ROB) && 
-(LSB_is_committed[head] || (LSB_openum[head] <= `OPENUM_LHU && (address != `RAM_IO_ADDRESS || io_rob_id_from_rob == LSB_rob_id[head])));
-
-
+assign full_signal = ls_full_signal;
+assign next_head = (head == `LSB_SIZE - 1) ? 0 : head + 1;
+assign next_tail = (tail == `LSB_SIZE - 1) ? 0 : tail + 1;
+assign io_rob_id_to_rob = (mem_address == `RAM_IO_ADDRESS) ? LSB_rob_id[head] : `ZERO_ROB;
+assign issue_cnt = (((LSB_busy[head] && busy_signal_from_lsu == `FALSE && LSB_Q1[head] == `ZERO_ROB && LSB_Q2[head] == `ZERO_ROB) 
+&& ((LSB_openum[head] <= `OPENUM_LHU && (mem_address != `RAM_IO_ADDRESS || io_rob_id_from_rob == LSB_rob_id[head]))
+|| (LSB_is_committed[head]))
+) ? -1 : 0);
+assign ls_full_signal = (lsb_element_cnt >= `LSB_SIZE - `FULL_WARNING);
+assign insert_cnt = (enable_signal_from_dispatcher ? 1 : 0);
 
 integer i;
 
+wire [`ROB_ID_TYPE] updated_Q1 = (valid_signal_from_Arith_unit_cdb && Q1_from_dispatcher == rob_id_from_Arith_unit_cdb) ? `ZERO_ROB : ((valid_signal_from_LS_unit_cdb && Q1_from_dispatcher == rob_id_from_LS_unit_cdb) ? `ZERO_ROB : Q1_from_dispatcher);
+wire [`ROB_ID_TYPE] updated_Q2 = (valid_signal_from_Arith_unit_cdb && Q2_from_dispatcher == rob_id_from_Arith_unit_cdb) ? `ZERO_ROB : ((valid_signal_from_LS_unit_cdb && Q2_from_dispatcher == rob_id_from_LS_unit_cdb) ? `ZERO_ROB : Q2_from_dispatcher);
+wire [`DATA_TYPE] updated_V1 = (valid_signal_from_Arith_unit_cdb && Q1_from_dispatcher == rob_id_from_Arith_unit_cdb) ? result_from_Arith_unit_cdb : ((valid_signal_from_LS_unit_cdb && Q1_from_dispatcher == rob_id_from_LS_unit_cdb) ? result_from_LS_unit_cdb : V1_from_dispatcher);
+wire [`DATA_TYPE] updated_V2 = (valid_signal_from_Arith_unit_cdb && Q2_from_dispatcher == rob_id_from_Arith_unit_cdb) ? result_from_Arith_unit_cdb : ((valid_signal_from_LS_unit_cdb && Q2_from_dispatcher == rob_id_from_LS_unit_cdb) ? result_from_LS_unit_cdb : V2_from_dispatcher);
+
+//for vcd:
+reg [`ROB_ID_TYPE] debug_Q1, debug_Q2;
+reg [`OPENUM_TYPE] debug_openum;
+
 always @(posedge clk) begin
-    if(rst || misbranch_flag == `TRUE) begin
-        rob_id_to_LS_unit_cdb <= `ZERO_ROB;
-        for(i = 0; i <= 15; i = i + 1) begin
+    if (rst || (misbranch_flag && store_tail == `INVALID_LSB)) begin
+        lsb_element_cnt <= `ZERO_WORD;
+        head <= `ZERO_LSB;
+        tail <= `ZERO_LSB;
+        store_tail <= `INVALID_LSB;
+        for (i = 0; i < `LSB_SIZE; i=i+1) begin
             LSB_busy[i] <= `FALSE;
-            LSB_imm[i] <= `ZERO_WORD;
             LSB_openum[i] <= `OPENUM_NOP;
-            LSB_is_committed[i] <= `FALSE;
-            LSB_Q1[i] <= `ZERO_ROB;
-            LSB_Q2[i] <= `ZERO_ROB;
+            LSB_imm[i] <= `ZERO_WORD;
             LSB_V1[i] <= `ZERO_WORD;
             LSB_V2[i] <= `ZERO_WORD;
-            LSB_rob_id[i] <= `ZERO_ROB; 
+            LSB_Q1[i] <= `ZERO_ROB;
+            LSB_Q2[i] <= `ZERO_ROB;
+            LSB_rob_id[i] <= `ZERO_ROB;
+            LSB_is_committed[i] <= `FALSE;
         end
-        LSB_cur_size <= `ZERO_WORD;
-        head <= `ZERO_LSB; tail <= `ZERO_ROB;
         enable_signal_to_lsu <= `FALSE;
-    end else if(~rdy) begin
-    end else begin
+    end
+    else if (~rdy) begin
+    end
+    else if (misbranch_flag) begin
+        tail <= (store_tail == `LSB_SIZE - 1) ? 0 : store_tail + 1;
+        lsb_element_cnt <= ((store_tail > head) ? store_tail - head + 1 : `LSB_SIZE - head + store_tail + 1);
+        for (i = 0; i < `LSB_SIZE; i = i+1)
+            if (LSB_is_committed[i] == `FALSE || LSB_openum[i] <= `OPENUM_LHU) 
+                LSB_busy[i] <= `FALSE;
+    end
+    else begin
         debug_Q1 <= LSB_Q1[head];
         debug_Q2 <= LSB_Q2[head];
         debug_openum <= LSB_openum[head];
-        //1.将新的指令放入LSB中
-        //2.将head所在的指令传给LSU
-        //3.监听CDB总线更新LSB中的信息
-        //$display("V1: ", head);
         enable_signal_to_lsu <= `FALSE;
-        LSB_cur_size <= LSB_cur_size - send_to_lsu_signal + enable_signal_from_dispatcher;
-        if(enable_signal_from_dispatcher == `TRUE) begin
-            //$display("insert inst into LSB:", openum_from_dispatcher);
-            LSB_busy[tail] <= `TRUE;
-            LSB_openum[tail] <= openum_from_dispatcher;
-            LSB_imm[tail] <= imm_from_dispatcher;
-            LSB_Q1[tail] <= updated_Q1;
-            LSB_Q2[tail] <= updated_Q2;
-            LSB_V1[tail] <= updated_V1;
-            LSB_V2[tail] <= updated_V2;
-            LSB_rob_id[tail] <= rob_id_from_dispatcher;
-            LSB_is_committed[tail] <= `FALSE;
-            tail <= next_tail;
+        lsb_element_cnt <= lsb_element_cnt + insert_cnt + issue_cnt;
+
+        //alloc from dispatcher:
+        if (enable_signal_from_dispatcher) begin
+                LSB_busy[tail] <= `TRUE;
+                LSB_openum[tail] <= openum_from_dispatcher;          
+                LSB_Q1[tail] <= updated_Q1;
+                LSB_Q2[tail] <= updated_Q2;
+                LSB_V1[tail] <= updated_V1;
+                LSB_V2[tail] <= updated_V2;
+                LSB_imm[tail] <= imm_from_dispatcher;
+                LSB_rob_id[tail] <= rob_id_from_dispatcher;
+                LSB_is_committed[tail] <= `FALSE;
+                tail <= next_tail;
         end
 
-        //rob commit:
-        if(commit_signal == `TRUE) begin
-            //更改ROB的commit tag:
-            for(i = 0; i < `ROB_SIZE; i = i + 1) begin
-                if(LSB_busy[i] && LSB_rob_id[i] == commit_rob_id_from_rob && !LSB_is_committed[i]) begin
-                    LSB_is_committed[i] <= `TRUE;
-                end
-            end
-        end
-
-        if(LSB_busy[head] && busy_signal_from_lsu == `FALSE && LSB_Q1[head] == `ZERO_ROB && LSB_Q2[head] == `ZERO_ROB) begin
+        //send to lsu:
+        if (LSB_busy[head] && !busy_signal_from_lsu && LSB_Q1[head] == `ZERO_ROB && LSB_Q2[head] == `ZERO_ROB) begin
+            // load
             //$display("hello!!!!!!");
             if (LSB_openum[head] <= `OPENUM_LHU) begin
-                //load:
-                //clear LSB[head]:
                 //$display("hello_11111111111111");
-                if(address != `RAM_IO_ADDRESS || LSB_rob_id[head] == io_rob_id_from_rob) begin
+                if (mem_address != `RAM_IO_ADDRESS || io_rob_id_from_rob == LSB_rob_id[head]) begin
+                    //$display("hello_11111111111111");
+                    enable_signal_to_lsu <= `TRUE;
+                    openum_to_lsu <= LSB_openum[head];
+                    mem_address_to_lsu <= mem_address;
+                    rob_id_to_LS_unit_cdb <= LSB_rob_id[head];
+                    //clear LSB[head]:
                     LSB_busy[head] <= `FALSE;
-                    LSB_rob_id[head] <= `ZERO_ROB;
+                    LSB_rob_id[head] <= `ZERO_ROB; 
                     LSB_is_committed[head] <= `FALSE;
                     LSB_imm[head] <= `ZERO_WORD;
-                    LSB_openum[head] <= `OPENUM_NOP;
                     LSB_Q1[head] <= `ZERO_ROB;
                     LSB_Q2[head] <= `ZERO_ROB;
                     LSB_V1[head] <= `ZERO_WORD;
                     LSB_V2[head] <= `ZERO_WORD;
-                    //send information to lsu:
-                    enable_signal_to_lsu <= `TRUE;
-                    openum_to_lsu <= LSB_openum[head];
-                    mem_address_to_lsu <= LSB_imm[head] + LSB_V1[head];
-                    stored_data <= `ZERO_WORD;
-                    rob_id_to_LS_unit_cdb <= LSB_rob_id[head];
                     head <= next_head;
                 end
             end
             else begin
-                //store:
-                //clear LSB[head]:
                 //$display("hello_22222222222");
-                if(LSB_is_committed[head]) begin
+                if (LSB_is_committed[head]) begin
+                    //$display("hello_22222222222");
+                    enable_signal_to_lsu <= `TRUE;
+                    openum_to_lsu <= LSB_openum[head];
+                    mem_address_to_lsu <= mem_address;
+                    stored_data <= LSB_V2[head];
+                    rob_id_to_LS_unit_cdb <= LSB_rob_id[head];
+                    //clear LSB[head]:
                     LSB_busy[head] <= `FALSE;
                     LSB_rob_id[head] <= `ZERO_ROB;
                     LSB_is_committed[head] <= `FALSE;
                     LSB_imm[head] <= `ZERO_WORD;
-                    LSB_openum[head] <= `OPENUM_NOP;
                     LSB_Q1[head] <= `ZERO_ROB;
                     LSB_Q2[head] <= `ZERO_ROB;
                     LSB_V1[head] <= `ZERO_WORD;
                     LSB_V2[head] <= `ZERO_WORD;
-                    //send information to lsu:
-                    enable_signal_to_lsu <= `TRUE;
-                    openum_to_lsu <= LSB_openum[head];
-                    mem_address_to_lsu <= LSB_imm[head] + LSB_V1[head];
-                    stored_data <= LSB_V2[head];
-                    rob_id_to_LS_unit_cdb <= LSB_rob_id[head];
                     head <= next_head;
+                    if (store_tail == head) begin
+                        store_tail <= `INVALID_LSB;
+                    end  
+                end 
+            end
+        end
+
+        //cdb update:
+        if (valid_signal_from_Arith_unit_cdb) begin
+            for (i = 0; i < `LSB_SIZE; i = i + 1) begin
+                if (LSB_Q1[i] == rob_id_from_Arith_unit_cdb) begin
+                    LSB_V1[i] <= result_from_Arith_unit_cdb;
+                    LSB_Q1[i] <= `ZERO_ROB;
+                end
+                if (LSB_Q2[i] == rob_id_from_Arith_unit_cdb) begin
+                    LSB_V2[i] <= result_from_Arith_unit_cdb;
+                    LSB_Q2[i] <= `ZERO_ROB;
+                end
+            end
+        end
+        if (valid_signal_from_LS_unit_cdb) begin
+            for (i = 0; i < `LSB_SIZE; i = i + 1) begin
+                if (LSB_Q1[i] == rob_id_from_LS_unit_cdb) begin
+                    LSB_V1[i] <= result_from_LS_unit_cdb;
+                    LSB_Q1[i] <= `ZERO_ROB;
+                end
+                if (LSB_Q2[i] == rob_id_from_LS_unit_cdb) begin
+                    LSB_V2[i] <= result_from_LS_unit_cdb;
+                    LSB_Q2[i] <= `ZERO_ROB;
                 end
             end
         end
 
-        if(valid_signal_from_Arith_unit_cdb) begin
-            for(i = 0; i <= 15; i = i + 1) begin
-                if(LSB_Q1[i] == rob_id_from_Arith_unit_cdb) begin
-                    LSB_Q1[i] <= `ZERO_ROB;
-                    LSB_V1[i] <= result_from_Arith_unit_cdb;
+        //commit update:
+        if (commit_signal) begin
+            for (i = 0; i < `LSB_SIZE; i=i+1) begin
+                if (LSB_busy[i] && LSB_rob_id[i] == commit_rob_id_from_rob && !LSB_is_committed[i]) begin
+                    LSB_is_committed[i] <= `TRUE;
+                    if (LSB_openum[i] >= `OPENUM_SB) begin
+                        store_tail <= i;
+                    end
                 end
-                if(LSB_Q2[i] == rob_id_from_Arith_unit_cdb) begin
-                    LSB_Q2[i] <= `ZERO_ROB;
-                    LSB_V2[i] <= result_from_Arith_unit_cdb;
-                end
-            end
-        end
-        if(valid_signal_from_LS_unit_cdb) begin
-            for(i = 0 ; i <= 15; i = i + 1) begin
-                if(LSB_Q1[i] == rob_id_from_LS_unit_cdb) begin
-                    LSB_Q1[i] <= `ZERO_ROB;
-                    LSB_V1[i] <= result_from_LS_unit_cdb;
-                end
-                if(LSB_Q2[i]  == rob_id_from_LS_unit_cdb) begin
-                    LSB_Q2[i] <= `ZERO_ROB;
-                    LSB_V2[i] <= result_from_LS_unit_cdb;
-                end    
             end
         end
     end

@@ -1,5 +1,5 @@
 `include "/mnt/c/Users/zbl/Desktop/RISCV-CPU/riscv/src/constant.v"
-//nmodule 作用：数据分发中心,接受各方数据并且在cdb总线上进行广播
+
 module dispatcher(
     //system clock:
     input wire clk,
@@ -104,21 +104,17 @@ data_forwarding internal_data_forwarding(
     .valid_from_Arith_unit_cdb(valid_from_Arith_unit_cdb),
     .rob_id_from_Arith_unit_cdb(rob_id_from_Arith_unit_cdb),
     .result_from_Arith_unit_cdb(result_from_Arith_unit_cdb),
-
     .valid_from_LS_unit_cdb(valid_from_LS_unit_cdb),
     .rob_id_from_LS_unit_cdb(rob_id_from_LS_unit_cdb),
     .result_from_LS_unit_cdb(result_from_LS_unit_cdb),
-
     .Q1_ready_from_rob(Q1_ready_from_rob),
     .Q2_ready_from_rob(Q2_ready_from_rob),
     .V1_result_from_rob(V1_result_from_rob),
     .V2_result_from_rob(V2_result_from_rob),
-
     .Q1_from_reg(Q1_from_reg),
     .Q2_from_reg(Q2_from_reg),
     .V1_from_reg(V1_from_reg),
     .V2_from_reg(V2_from_reg),
-
     .Q1_to_dispatch(Q1),
     .Q2_to_dispatch(Q2),
     .V1_to_dispatch(V1),
