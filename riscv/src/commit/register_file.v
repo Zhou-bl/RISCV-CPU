@@ -72,6 +72,7 @@ always @(*) begin
     end
     if (input_commit_flag) begin
         if (rd_from_ROB != `ZERO_REG) begin
+            //如果目的寄存器是x0那么将结果抛弃
             output_rd_from_ROB = rd_from_ROB; 
             output_V_from_ROB = V_from_ROB;
             if (alloc_signal_from_dispatcher && (rd_from_ROB == rd_from_dispatcher)) begin
