@@ -41,17 +41,19 @@ reg buffered_read_or_write_flag_from_ls_ex;
 reg [2: 0] buffered_rw_length_from_ls_ex;
 reg [`ADDR_TYPE] buffered_access_address_from_ls_ex;
 reg [`ADDR_TYPE] buffered_write_data_from_ls_ex;
-reg uart_write_is_io, uart_write_lock;
 reg [`STATUS_TYPE] status;
 reg [`INT_TYPE] ram_access_cnt, ram_access_size;
 reg [`ADDR_TYPE] ram_access_pc;
 reg [`DATA_TYPE] writing_data;
 
-reg ena_output_status, ena_output_fetch_valid, ena_output_ls_valid;
+reg enable_output_status, enable_output_fetch_valid, enable_output_ls_valid;
 
-wire [`STATUS_TYPE] status_magic = (ena_output_status) ? STATUS_IDLE : status;
-wire buf_fetch_valid_magic = (ena_output_fetch_valid) ? `FALSE : buffered_start_query_signal;
-wire buf_ls_valid_magic = (ena_output_ls_valid) ? `FALSE : buffered_start_access_mem_signal;
+wire [`STATUS_TYPE] status_output = (enable_output_status) ? STATUS_IDLE : status;
+wire buf_fetch_valid_output = (enable_output_fetch_valid) ? `FALSE : buffered_start_query_signal;
+wire buf_ls_valid_output = (enable_output_ls_valid) ? `FALSE : buffered_start_access_mem_signal;
+
+//for IO:
+reg uart_write_is_io, uart_write_lock;
 
 always @(posedge clk) begin
     if (rst == `TRUE) begin
@@ -75,12 +77,12 @@ always @(posedge clk) begin
         access_address_to_ram <= `ZERO_ADDR;
         read_or_write_flag_to_ram <= `READ_FLAG;
 
-        if (ena_output_status) status <= STATUS_IDLE;
-        if (ena_output_fetch_valid) buffered_start_query_signal <= `FALSE;
-        if (ena_output_ls_valid) buffered_start_access_mem_signal <= `FALSE;
+        if (enable_output_status) status <= STATUS_IDLE;
+        if (enable_output_fetch_valid) buffered_start_query_signal <= `FALSE;
+        if (enable_output_ls_valid) buffered_start_access_mem_signal <= `FALSE;
 
         //buffered the query from instruction or lsu:
-        if (status_magic != STATUS_IDLE || (start_access_mem_signal && start_query_signal)) begin
+        if (status_output != STATUS_IDLE || (start_access_mem_signal && start_query_signal)) begin
             if (start_query_signal == `FALSE && start_access_mem_signal == `TRUE) begin
                 buffered_start_access_mem_signal <= `TRUE;
                 buffered_read_or_write_flag_from_ls_ex <= read_or_write_flag_from_ls_ex;
@@ -94,7 +96,7 @@ always @(posedge clk) begin
             end
         end
 
-        if (status_magic == STATUS_IDLE) begin 
+        if (status_output == STATUS_IDLE) begin 
             finish_query_signal <= `FALSE;
             finish_rw_flag_to_ls_ex <= `FALSE;
             output_inst_to_if <= `ZERO_ADDR;
@@ -120,7 +122,7 @@ always @(posedge clk) begin
                     status <= STATUS_LOAD;
                 end
             end
-            else if (buf_ls_valid_magic) begin
+            else if (buf_ls_valid_output) begin
                 if (buffered_read_or_write_flag_from_ls_ex == `WRITE_FLAG) begin
                     ram_access_cnt <= `ZERO_WORD;
                     ram_access_size <= buffered_rw_length_from_ls_ex;
@@ -148,7 +150,7 @@ always @(posedge clk) begin
                 read_or_write_flag_to_ram <= `READ_FLAG;
                 status <= STATUS_FETCH;
             end
-            else if (buf_fetch_valid_magic) begin
+            else if (buf_fetch_valid_output) begin
                 ram_access_cnt <= `ZERO_WORD;
                 ram_access_size <= 32'h4;
                 access_address_to_ram <= buffered_pc_from_if;
@@ -158,8 +160,8 @@ always @(posedge clk) begin
                 buffered_start_query_signal <= `FALSE;
             end
         end
-        else if (!(io_buffer_full_signal && status_magic == STATUS_STORE)) begin
-            if (status_magic == STATUS_FETCH) begin
+        else if (!(io_buffer_full_signal && status_output == STATUS_STORE)) begin
+            if (status_output == STATUS_FETCH) begin
                 access_address_to_ram <= ram_access_pc;
                 read_or_write_flag_to_ram <= `READ_FLAG;
                 case (ram_access_cnt)
@@ -179,7 +181,7 @@ always @(posedge clk) begin
                     ram_access_cnt <= ram_access_cnt + 32'h1;
                 end
             end
-            else if (status_magic == STATUS_LOAD) begin
+            else if (status_output == STATUS_LOAD) begin
                 access_address_to_ram <= ram_access_pc;
                 read_or_write_flag_to_ram <= `READ_FLAG;
                 case (ram_access_cnt)
@@ -200,7 +202,7 @@ always @(posedge clk) begin
                     ram_access_cnt <= ram_access_cnt + 1;
                 end
             end
-            else if (status_magic == STATUS_STORE) begin
+            else if (status_output == STATUS_STORE) begin
                 if (uart_write_is_io == `FALSE || ~uart_write_lock) begin
                     uart_write_lock <= `TRUE;
                     access_address_to_ram <= ram_access_pc;
@@ -233,17 +235,17 @@ always @(posedge clk) begin
 end
 
 always @(*) begin
-    ena_output_status = `FALSE;
-    ena_output_ls_valid = `FALSE;
-    ena_output_fetch_valid = `FALSE;
+    enable_output_status = `FALSE;
+    enable_output_ls_valid = `FALSE;
+    enable_output_fetch_valid = `FALSE;
 
     if (stop_signal) begin
         if (status == STATUS_FETCH || status == STATUS_LOAD) begin
-            ena_output_status = `TRUE;
+            enable_output_status = `TRUE;
         end
-        ena_output_fetch_valid = `TRUE;
+        enable_output_fetch_valid = `TRUE;
         if (buffered_start_access_mem_signal == `TRUE && buffered_read_or_write_flag_from_ls_ex == `READ_FLAG) begin
-            ena_output_ls_valid = `TRUE;
+            enable_output_ls_valid = `TRUE;
         end
     end
 end
